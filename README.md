@@ -170,4 +170,4 @@ npx expo start --clear
 
 ## 👩‍💻 Autora
 
-Desenvolvido por **[Seu Nome]** como TCC do curso técnico na ETEC.
+Desenvolvido por **Sophia Lorena** como TCC do curso técnico na ETEC.
