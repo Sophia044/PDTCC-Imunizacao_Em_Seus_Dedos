@@ -107,6 +107,8 @@ cd SEU_REPOSITORIO
 **2. Instale as dependências**
 ```bash
 npm install
+ou
+npx expo install
 ```
 
 **3. Inicie o servidor de desenvolvimento**

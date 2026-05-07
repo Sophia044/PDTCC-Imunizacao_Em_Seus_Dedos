@@ -11,7 +11,7 @@
 import React from 'react';
 
 // --- Componentes de layout e interação do React Native ---
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // --- Animações com Reanimated ---
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -59,18 +59,25 @@ const INFO_ITEMS = [
 export default function ProfileScreen() {
   // Exibe confirmação antes de deslogar e redireciona para o login
   const handleLogout = () => {
-    Alert.alert(
-      'Sair da Conta',
-      'Tem certeza que deseja sair?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Sair',
-          style: 'destructive',
-          onPress: () => router.replace('/(auth)/login'),
-        },
-      ]
-    );
+    if (Platform.OS === 'web') {
+      // Alert.alert não funciona corretamente na web — usa confirm nativo do browser
+      if (window.confirm('Tem certeza que deseja sair da conta?')) {
+        router.replace('/(auth)/login');
+      }
+    } else {
+      Alert.alert(
+        'Sair da Conta',
+        'Tem certeza que deseja sair?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Sair',
+            style: 'destructive',
+            onPress: () => router.replace('/(auth)/login'),
+          },
+        ]
+      );
+    }
   };
 
   return (
