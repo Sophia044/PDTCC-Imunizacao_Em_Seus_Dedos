@@ -36,13 +36,13 @@ function TabIcon({ name, color, focused }: { name: IoniconsName; color: string; 
 
 // Estilos do ícone da tab bar
 const tabStyles = StyleSheet.create({
-  iconWrap:       { width: 40, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  iconWrap:       { width: 38, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   iconWrapActive: { backgroundColor: Colors.PROFESSIONAL_LIGHT }, // Verde suave quando ativo
 });
 
 // -------------------------------------------------------
 // Layout principal da área do Profissional
-// Define as 4 abas: Início | Pacientes | Registrar | Configurações
+// Define as 4 abas: Home | Pacientes | Registrar | Perfil
 // A cor ativa da tab bar é VERDE (#588C5A) — identidade do profissional
 // -------------------------------------------------------
 export default function ProfessionalLayout() {
@@ -56,24 +56,28 @@ export default function ProfessionalLayout() {
           backgroundColor: Colors.NEUTRAL.WHITE,
           borderTopWidth: 1,
           borderTopColor: Colors.BORDER,
-          height: 64,
-          paddingBottom: 10,
-          paddingTop: 4,
+          height: 72,          // Altura maior para acomodar ícone + rótulo sem cortes
+          paddingBottom: 14,   // Espaço inferior generoso
+          paddingTop: 6,       // Espaço superior equilibrado
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: {
+          fontSize: 10,        // Fonte menor para caber sem corte em telas pequenas
+          fontWeight: '600',
+          marginBottom: 2,     // Afasta o texto da borda inferior da tab bar
+        },
       }}
     >
-      {/* Aba: Início do profissional */}
-      <Tabs.Screen name="home"             options={{ title: 'Início',        tabBarIcon: ({ color, focused }) => <TabIcon name="home"          color={color} focused={focused} /> }} />
+      {/* Aba: Home do profissional */}
+      <Tabs.Screen name="home"             options={{ title: 'Home',      tabBarIcon: ({ color, focused }) => <TabIcon name="home"          color={color} focused={focused} /> }} />
 
       {/* Aba: Lista de pacientes */}
-      <Tabs.Screen name="patients"         options={{ title: 'Pacientes',     tabBarIcon: ({ color, focused }) => <TabIcon name="people"        color={color} focused={focused} /> }} />
+      <Tabs.Screen name="patients"         options={{ title: 'Pacientes', tabBarIcon: ({ color, focused }) => <TabIcon name="people"        color={color} focused={focused} /> }} />
 
       {/* Aba: Registrar nova vacinação */}
-      <Tabs.Screen name="register-vaccine" options={{ title: 'Registrar',     tabBarIcon: ({ color, focused }) => <TabIcon name="add-circle"    color={color} focused={focused} /> }} />
+      <Tabs.Screen name="register-vaccine" options={{ title: 'Registrar', tabBarIcon: ({ color, focused }) => <TabIcon name="add-circle"    color={color} focused={focused} /> }} />
 
-      {/* Aba: Configurações do profissional (identidade verde) */}
-      <Tabs.Screen name="settings"         options={{ title: 'Configurações', tabBarIcon: ({ color, focused }) => <TabIcon name="settings-outline" color={color} focused={focused} /> }} />
+      {/* Aba: Perfil do profissional (identidade verde) */}
+      <Tabs.Screen name="settings"         options={{ title: 'Perfil',    tabBarIcon: ({ color, focused }) => <TabIcon name="person-circle" color={color} focused={focused} /> }} />
     </Tabs>
   );
 }

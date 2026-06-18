@@ -102,7 +102,7 @@ export default function PatientHome() {
         <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.section}>
           <Text style={styles.sectionTitle}>Próximas Vacinas</Text>
           {/* Scroll horizontal para exibir múltiplos cards de vacinas pendentes */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 20 }}>
             {upcoming.map((v, i) => (
               <Animated.View key={v.id} entering={FadeInDown.delay(250 + i * 60).duration(400)}>
                 {/* Card no modo horizontal (exibição compacta) */}
@@ -124,7 +124,7 @@ export default function PatientHome() {
         </Animated.View>
 
         {/* Espaço extra para não ficar colado na tab bar */}
-        <View style={{ height: 80 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* ---- FAB (Botão Flutuante): Adicionar nova vacina ---- */}
@@ -162,5 +162,5 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 17, fontWeight: '800', color: Colors.NEUTRAL.DARK_TEXT, marginBottom: 14, paddingHorizontal: 20 },
 
   // === BOTÃO FLUTUANTE (FAB) ===
-  fab:          { position: 'absolute', bottom: 80, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.PRIMARY, alignItems: 'center', justifyContent: 'center', shadowColor: Colors.PRIMARY, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
+  fab:          { position: 'absolute', bottom: 30, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.PRIMARY, alignItems: 'center', justifyContent: 'center', shadowColor: Colors.PRIMARY, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
 });

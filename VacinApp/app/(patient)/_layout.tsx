@@ -29,9 +29,9 @@ export default function PatientLayout() {
           backgroundColor: Colors.NEUTRAL.WHITE,
           borderTopWidth: 1,
           borderTopColor: Colors.BORDER,
-          height: 64,
-          paddingBottom: 10,
-          paddingTop: 4,
+          height: 70,
+          paddingBottom: 12,
+          paddingTop: 6,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
