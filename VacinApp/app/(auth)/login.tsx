@@ -107,8 +107,8 @@ export default function LoginScreen() {
 
         {/* ---- BOTÕES DE ACESSO RÁPIDO POR PERFIL ---- */}
         <Animated.View entering={FadeInDown.delay(600).duration(600)} style={styles.profileBtns}>
-          {/* Botão: Entrar como Paciente (borda roxa) */}
-          <TouchableOpacity style={styles.patientBtn} onPress={() => router.replace('/(patient)/home')}>
+          {/* Botão: Entrar como Paciente (borda roxa) → vai para login exclusivo */}
+          <TouchableOpacity style={styles.patientBtn} onPress={() => router.push('/(auth)/login-user')}>
             <Ionicons name="person" size={20} color={Colors.PRIMARY} />
             <Text style={styles.patientBtnText}>Entrar como Paciente</Text>
           </TouchableOpacity>
@@ -123,7 +123,7 @@ export default function LoginScreen() {
         {/* ---- LINK PARA CADASTRO ---- */}
         <Animated.View entering={FadeInDown.delay(700).duration(600)} style={styles.registerRow}>
           <Text style={styles.registerText}>Não tem conta? </Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/register-patient')}>
+          <TouchableOpacity onPress={() => router.push('/(auth)/choose-registration')}>
             <Text style={styles.registerLink}>Cadastre-se</Text>
           </TouchableOpacity>
         </Animated.View>
