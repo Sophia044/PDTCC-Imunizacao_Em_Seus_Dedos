@@ -113,7 +113,7 @@ export default function CalendarScreen() {
               textMonthFontWeight: '700',
               textDayFontSize: 14,
               textDayHeaderFontWeight: '600',
-              dotSize: 6,
+              // dotSize removido: não é propriedade válida do tipo Theme (react-native-calendars)
             }}
           />
         </Animated.View>

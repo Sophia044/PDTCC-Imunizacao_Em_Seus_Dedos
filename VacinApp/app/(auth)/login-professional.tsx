@@ -1,9 +1,40 @@
 // ============================================================
 // TELA: Login do Profissional de Saúde
 // DESCRIÇÃO: Tela exclusiva de autenticação para profissionais
-//            de saúde cadastrados no sistema. Suporta Médico
-//            (CRM) e Enfermeiro (COREN). Profissionais não podem
-//            criar conta — o acesso é pré-cadastrado pelo sistema.
+//            de saúde. O profissional seleciona a rede em que
+//            está atuando (Pública ou Privada) e insere suas
+//            credenciais institucionais.
+//
+//            Rede Pública:
+//              - Email institucional
+//              - Registro Profissional (CRM ou COREN)
+//              - Senha
+//
+//            Rede Privada:
+//              - Instituição (hospital/clínica)
+//              - Email profissional
+//              - Registro Profissional (CRM ou COREN)
+//              - Senha
+//
+// PREPARADO PARA BACKEND:
+//   O papel do profissional (médico/enfermeiro) NÃO é solicitado
+//   manualmente. Será retornado automaticamente pelo backend
+//   com base no Registro Profissional (CRM ou COREN).
+//
+//   Payload enviado à API:
+//   {
+//     email: string,
+//     password: string,
+//     professionalRegistry: string,  // CRM ou COREN
+//     networkType: 'public' | 'private',
+//     institution?: string,          // Apenas se networkType === 'private'
+//   }
+//
+//   Resposta esperada do backend:
+//   {
+//     id, nome, role, networkType, institution, permissions
+//   }
+//
 // ACESSO: Profissional
 // ROTA: /app/(auth)/login-professional.tsx
 // ============================================================
@@ -23,7 +54,7 @@ import {
 } from 'react-native';
 
 // --- Animações com Reanimated ---
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOutDown, Layout } from 'react-native-reanimated';
 
 // --- Navegação com Expo Router ---
 import { router } from 'expo-router';
@@ -41,49 +72,114 @@ import { Colors } from '../../constants/Colors';
 import { InputField } from '../../components/InputField';
 import { PrimaryButton } from '../../components/PrimaryButton';
 
+// --- Componentes reutilizáveis de autenticação ---
+import { AuthSegmentSelector, AuthContextMessage } from '../../components/auth';
+import type { SegmentOption } from '../../components/auth';
+
+// -------------------------------------------------------
+// Tipos — alinhados ao payload da API futura
+// -------------------------------------------------------
+
+/** Tipo da rede de atuação do profissional */
+type NetworkType = 'public' | 'private';
+
+/** Payload que será enviado ao endpoint de autenticação do profissional */
+interface ProfessionalLoginPayload {
+  email: string;
+  password: string;
+  professionalRegistry: string;  // CRM ou COREN — o backend determina o papel
+  networkType: NetworkType;
+  institution?: string;          // Obrigatório apenas na Rede Privada
+}
+
+// -------------------------------------------------------
+// Opções do seletor de rede — configuráveis para fácil manutenção
+// -------------------------------------------------------
+const NETWORK_OPTIONS: SegmentOption[] = [
+  { value: 'public',  label: 'Rede Pública', icon: 'medkit'          },
+  { value: 'private', label: 'Rede Privada',  icon: 'shield-checkmark' },
+];
+
+// -------------------------------------------------------
+// Mensagens contextuais por rede
+// -------------------------------------------------------
+const NETWORK_MESSAGES: Record<NetworkType, string> = {
+  public:  'Você está acessando sua conta da Rede Pública de Saúde.',
+  private: 'Você está acessando sua conta da Rede Privada.',
+};
+
+// -------------------------------------------------------
+// Ícones contextuais por rede
+// -------------------------------------------------------
+const NETWORK_ICONS: Record<NetworkType, React.ComponentProps<typeof Ionicons>['name']> = {
+  public:  'medkit-outline',
+  private: 'shield-checkmark-outline',
+};
+
 // -------------------------------------------------------
 // COMPONENTE PRINCIPAL: Login do Profissional de Saúde
 // -------------------------------------------------------
 export default function LoginProfessionalScreen() {
-  // Estado: tipo de profissional selecionado ('doctor' | 'nurse')
-  const [selectedRole, setSelectedRole] = useState<'doctor' | 'nurse'>('doctor');
-  // Estado: e-mail institucional do profissional
+
+  // ── Estados do formulário ──────────────────────────────────
+  // Nomes alinhados ao payload da API para facilitar integração futura.
+
+  /** Rede de atuação do profissional — enviado como `networkType` */
+  const [networkType, setNetworkType] = useState<NetworkType>('public');
+
+  /** E-mail institucional do profissional — enviado como `email` */
   const [email, setEmail] = useState('');
-  // Estado: identificador profissional (CRM para médico, COREN para enfermeiro)
-  const [professionalId, setProfessionalId] = useState('');
-  // Estado: senha de acesso
+
+  /** Senha de acesso — enviada como `password` */
   const [password, setPassword] = useState('');
 
-  // -------------------------------------------------------
-  // Labels dinâmicos com base no papel selecionado
-  // -------------------------------------------------------
-  const roleConfig = {
-    doctor: {
-      badgeIcon: 'medkit'  as const,
-      badgeText: 'Médico',
-      idLabel: 'CRM',
-      idPlaceholder: 'Digite seu CRM',
-    },
-    nurse: {
-      badgeIcon: 'medical' as const,
-      badgeText: 'Enfermeiro',
-      idLabel: 'COREN',
-      idPlaceholder: 'Digite seu COREN',
-    },
+  /**
+   * Registro profissional — enviado como `professionalRegistry`.
+   * Pode ser CRM (médicos) ou COREN (enfermeiros).
+   * O backend determina o papel com base neste registro.
+   */
+  const [professionalRegistry, setProfessionalRegistry] = useState('');
+
+  /**
+   * Instituição de atuação — enviada como `institution`.
+   * Visível e obrigatória somente na Rede Privada.
+   *
+   * TODO: No futuro, substituir este TextInput por um componente
+   *       de busca de hospitais/clínicas (ex: SearchInput com
+   *       autocomplete via API de estabelecimentos de saúde).
+   */
+  const [institution, setInstitution] = useState('');
+
+  // ── Flags derivadas do estado ──────────────────────────────
+  const isPublic  = networkType === 'public';
+  const isPrivate = networkType === 'private';
+
+  // ── Handler: troca de rede ─────────────────────────────────
+  const handleNetworkChange = (value: string) => {
+    setNetworkType(value as NetworkType);
+    // Limpa o campo de instituição ao trocar de rede
+    setInstitution('');
   };
 
-  const config = roleConfig[selectedRole];
-
-  // Mock de login — em produção chamar API com as credenciais
+  // ── Handler: login ─────────────────────────────────────────
   const handleLogin = () => {
-    // TODO: enviar credenciais para a API de autenticação do profissional
-    console.log('Login Profissional', {
-      role: selectedRole,
+    // Monta o payload exatamente como será enviado à API
+    const payload: ProfessionalLoginPayload = {
       email,
-      professionalId,
       password,
+      professionalRegistry,
+      networkType,
+      ...(isPrivate && institution ? { institution } : {}),
+    };
+
+    // TODO: Integrar com endpoint de autenticação do profissional
+    // Exemplo: await api.post('/auth/professional/login', payload);
+    console.log('Login Profissional (payload pronto para API):', payload);
+
+    router.replace({
+      pathname: '/(professional)/home',
+      params: { network: networkType },
     });
-    router.replace('/(professional)/home');
   };
 
   return (
@@ -120,105 +216,99 @@ export default function LoginProfessionalScreen() {
           <Text style={styles.subtitle}>Gerencie registros e acompanhe seus pacientes</Text>
         </Animated.View>
 
-        {/* ════════════════════════════════════════════════ */}
-        {/* ---- SELETOR DE PAPEL (Médico / Enfermeiro) ---- */}
-        {/* ════════════════════════════════════════════════ */}
-        <Animated.View entering={FadeInDown.delay(240).duration(600)} style={styles.roleSelector}>
-          <TouchableOpacity
-            style={[
-              styles.roleBtn,
-              selectedRole === 'doctor' && styles.roleBtnActive,
-            ]}
-            onPress={() => {
-              setSelectedRole('doctor');
-              setProfessionalId('');
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="medkit"
-              size={16}
-              color={selectedRole === 'doctor' ? Colors.NEUTRAL.WHITE : Colors.PROFESSIONAL}
-            />
-            <Text
-              style={[
-                styles.roleBtnText,
-                selectedRole === 'doctor' && styles.roleBtnTextActive,
-              ]}
-            >
-              Médico
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.roleBtn,
-              selectedRole === 'nurse' && styles.roleBtnActive,
-            ]}
-            onPress={() => {
-              setSelectedRole('nurse');
-              setProfessionalId('');
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="medical"
-              size={16}
-              color={selectedRole === 'nurse' ? Colors.NEUTRAL.WHITE : Colors.PROFESSIONAL}
-            />
-            <Text
-              style={[
-                styles.roleBtnText,
-                selectedRole === 'nurse' && styles.roleBtnTextActive,
-              ]}
-            >
-              Enfermeiro
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* ---- BADGE DE PERFIL DINÂMICO ---- */}
+        {/* ---- BADGE DE PERFIL ---- */}
         <Animated.View entering={FadeInDown.delay(250).duration(600)}>
           <View style={styles.profileBadge}>
-            <Ionicons name={config.badgeIcon} size={16} color={Colors.PROFESSIONAL} />
-            <Text style={styles.profileBadgeText}>{config.badgeText}</Text>
+            <Ionicons name="briefcase-outline" size={16} color={Colors.PROFESSIONAL} />
+            <Text style={styles.profileBadgeText}>Profissional de Saúde</Text>
           </View>
         </Animated.View>
 
-        {/* ---- AVISO INSTITUCIONAL ---- */}
+        {/* ════════════════════════════════════════════════════ */}
+        {/* ---- SELETOR DE REDE (Pública / Privada) ----       */}
+        {/* ════════════════════════════════════════════════════ */}
         <Animated.View entering={FadeInDown.delay(300).duration(600)}>
-          <View style={styles.infoBox}>
-            <Ionicons name="shield-checkmark-outline" size={18} color={Colors.PROFESSIONAL} />
-            <Text style={styles.infoText}>
-              O acesso profissional é restrito a contas previamente cadastradas pelo sistema.
-            </Text>
-          </View>
+
+          <Text style={styles.segmentLabel}>Em qual rede está atuando?</Text>
+
+          {/* Seletor reutilizável — variante verde do profissional */}
+          <AuthSegmentSelector
+            options={NETWORK_OPTIONS}
+            selected={networkType}
+            onChange={handleNetworkChange}
+            variant="professional"
+          />
+
+          {/* Mensagem contextual — re-anima ao trocar de rede */}
+          <Animated.View
+            key={networkType}
+            entering={FadeIn.duration(350)}
+          >
+            <AuthContextMessage
+              message={NETWORK_MESSAGES[networkType]}
+              icon={NETWORK_ICONS[networkType]}
+              variant="professional"
+            />
+          </Animated.View>
+
         </Animated.View>
 
-        {/* ════════════════════════════════════════════════ */}
-        {/* ---- FORMULÁRIO DE LOGIN ----                   */}
-        {/* ════════════════════════════════════════════════ */}
-        <Animated.View entering={FadeInDown.delay(380).duration(600)} style={styles.form}>
+        {/* ════════════════════════════════════════════════════ */}
+        {/* ---- FORMULÁRIO DE LOGIN ----                       */}
+        {/* ════════════════════════════════════════════════════ */}
+        <Animated.View
+          entering={FadeInDown.delay(380).duration(600)}
+          layout={Layout.springify()}
+          style={styles.form}
+        >
+
+          {/*
+           * Campo Instituição — exibido SOMENTE na Rede Privada.
+           *
+           * TODO: No futuro, substituir por um componente de busca
+           *       de estabelecimentos de saúde (SearchInput com
+           *       autocomplete via API de hospitais/clínicas privadas).
+           *       O estado `institution` (string) permanece o mesmo.
+           */}
+          {isPrivate && (
+            <Animated.View
+              entering={FadeInDown.duration(350)}
+              exiting={FadeOutDown.duration(250)}
+            >
+              <InputField
+                label="Instituição"
+                value={institution}
+                onChangeText={setInstitution}
+                icon="business-outline"
+                placeholder="Hospital ou clínica"
+                autoCapitalize="words"
+              />
+            </Animated.View>
+          )}
 
           {/* E-mail institucional */}
           <InputField
-            label="E-mail Institucional"
+            label="E-mail Profissional"
             value={email}
             onChangeText={setEmail}
             icon="mail-outline"
             keyboardType="email-address"
             autoCapitalize="none"
-            placeholder="nome@hospital.com.br"
+            placeholder={isPublic ? 'nome@hospital.gov.br' : 'nome@clinica.com.br'}
           />
 
-          {/* CRM ou COREN — dinâmico conforme papel selecionado */}
+          {/*
+           * Registro Profissional (CRM ou COREN).
+           * Não distingue médico de enfermeiro na tela — o backend
+           * identifica o papel com base no número informado.
+           */}
           <InputField
-            label={config.idLabel}
-            value={professionalId}
-            onChangeText={setProfessionalId}
+            label="Registro Profissional"
+            value={professionalRegistry}
+            onChangeText={setProfessionalRegistry}
             icon="card-outline"
-            placeholder={config.idPlaceholder}
-            autoCapitalize="characters"
+            placeholder="Digite seu CRM ou COREN"
+            autoCapitalize="none"
           />
 
           {/* Senha */}
@@ -234,6 +324,7 @@ export default function LoginProfessionalScreen() {
           <TouchableOpacity style={styles.forgot}>
             <Text style={styles.forgotText}>Esqueceu a senha?</Text>
           </TouchableOpacity>
+
         </Animated.View>
 
         {/* ---- BOTÃO ENTRAR ---- */}
@@ -245,10 +336,10 @@ export default function LoginProfessionalScreen() {
           />
         </Animated.View>
 
-        {/* ---- AVISO: SEM CADASTRO DISPONÍVEL ---- */}
-        <Animated.View entering={FadeInDown.delay(540).duration(600)} style={styles.noRegisterRow}>
+        {/* ---- AVISO INSTITUCIONAL ---- */}
+        <Animated.View entering={FadeInDown.delay(540).duration(600)} style={styles.infoRow}>
           <Ionicons name="information-circle-outline" size={15} color={Colors.NEUTRAL.MUTED} />
-          <Text style={styles.noRegisterText}>
+          <Text style={styles.infoText}>
             O cadastro de profissionais é realizado exclusivamente pelo administrador do sistema.
           </Text>
         </Animated.View>
@@ -289,7 +380,7 @@ const styles = StyleSheet.create({
   },
 
   // === LOGO ===
-  logoRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
+  logoRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
   logoCircle: {
     width: 44,
     height: 44,
@@ -298,42 +389,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoText:  { fontSize: 22, fontWeight: '800', color: Colors.PROFESSIONAL },
+  logoText:   { fontSize: 22, fontWeight: '800', color: Colors.PROFESSIONAL },
 
   // === TÍTULO E SUBTÍTULO ===
   title:    { fontSize: 28, fontWeight: '800', color: Colors.PROFESSIONAL, marginBottom: 6 },
   subtitle: { fontSize: 15, color: Colors.NEUTRAL.MUTED, marginBottom: 16 },
-
-  // === SELETOR DE PAPEL (Médico / Enfermeiro) ===
-  roleSelector: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  roleBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.PROFESSIONAL,
-    backgroundColor: Colors.PROFESSIONAL_LIGHT,
-  },
-  roleBtnActive: {
-    backgroundColor: Colors.PROFESSIONAL,
-    borderColor: Colors.PROFESSIONAL,
-  },
-  roleBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.PROFESSIONAL,
-  },
-  roleBtnTextActive: {
-    color: Colors.NEUTRAL.WHITE,
-  },
 
   // === BADGE DE PERFIL ===
   profileBadge: {
@@ -345,47 +405,29 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     alignSelf: 'flex-start',
-    marginBottom: 18,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: Colors.LIGHT_GREEN,
   },
   profileBadgeText: { fontSize: 13, fontWeight: '600', color: Colors.PROFESSIONAL },
 
-  // === AVISO INSTITUCIONAL ===
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: Colors.PROFESSIONAL_LIGHT,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 22,
-    borderWidth: 1,
-    borderColor: Colors.LIGHT_GREEN,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: Colors.PROFESSIONAL,
-    lineHeight: 18,
-    fontWeight: '500',
-  },
+  // === LABEL DO SELETOR ===
+  segmentLabel: { fontSize: 13, fontWeight: '700', color: Colors.NEUTRAL.DARK_TEXT, marginBottom: 10 },
 
   // === FORMULÁRIO ===
   form:       { marginBottom: 18 },
   forgot:     { alignSelf: 'flex-end', marginTop: -6 },
   forgotText: { fontSize: 13, color: Colors.PROFESSIONAL, fontWeight: '600' },
 
-  // === AVISO: SEM CADASTRO ===
-  noRegisterRow: {
+  // === AVISO INSTITUCIONAL ===
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 6,
     marginTop: 20,
     paddingHorizontal: 4,
   },
-  noRegisterText: {
+  infoText: {
     flex: 1,
     fontSize: 12,
     color: Colors.NEUTRAL.MUTED,

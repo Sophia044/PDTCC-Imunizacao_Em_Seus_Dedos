@@ -1,187 +1,353 @@
 // ============================================================
-// TELA: Home do Profissional de Saúde (Dashboard)
-// DESCRIÇÃO: Tela inicial do profissional após o login. Exibe
-//            cartões de estatísticas do dia (pacientes, vacinas,
-//            alertas), botão de acesso rápido para registrar
-//            vacinação e a lista dos pacientes recentes.
+// TELA: Home do Profissional de Saúde (Dashboard Dual)
+// DESCRIÇÃO: Dashboard principal do profissional. Renderiza
+//            conteúdo diferente com base na rede de atuação:
+//
+//            Rede Pública (network=public):
+//              - Sem agenda; pacientes chegam espontaneamente
+//              - Stats cards: atendimentos, vacinas, campanhas, estoque
+//              - Painel de ações rápidas sem listagem prévia de pacientes
+//              - Lista de últimos atendimentos
+//
+//            Rede Privada (network=private):
+//              - Com agenda do dia (AppointmentCard)
+//              - Botão "Atender sem agendamento" → busca
+//              - Ações rápidas simplificadas
+//
+// PREPARADO PARA BACKEND:
+//   - networkType virá do contexto de sessão (pós-login)
+//   - stats e appointments virão de endpoints REST
+//   - Toda navegação usa IDs, nunca nomes diretos
+//
 // ACESSO: Profissional
 // ROTA: /app/(professional)/home.tsx
 // ============================================================
 
-// --- Bibliotecas principais do React ---
 import React from 'react';
-
-// --- Componentes de layout e interação do React Native ---
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-// --- Animações com Reanimated ---
+import {
+  ScrollView, StyleSheet, Text, TouchableOpacity, View,
+} from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-
-// --- Área segura (evita sobreposição com status bar e notch) ---
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// --- Navegação com Expo Router ---
-import { router } from 'expo-router';
-
-// --- Controle da barra de status do sistema operacional ---
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-
-// --- Ícones vetoriais da biblioteca Ionicons ---
 import { Ionicons } from '@expo/vector-icons';
-
-// --- Paleta de cores oficial do VacinApp ---
 import { Colors } from '../../constants/Colors';
 
-// --- Dados mockados (simulam retorno de API) ---
-import { mockPatients, mockVaccines } from '../../constants/MockData';
+// ── Dados mock ────────────────────────────────────────────
+import {
+  mockProfessionalPublic,
+  mockProfessionalPrivate,
+  mockPatientProfiles,
+  mockAppointments,
+  mockCampaigns,
+  mockStock,
+} from '../../constants/MockData';
+
+// ── Componentes reutilizáveis ──────────────────────────────
+import {
+  ProfessionalHeader,
+  StatCard,
+  QuickActionButton,
+  PatientCard,
+  AppointmentCard,
+} from '../../components/professional';
 
 // -------------------------------------------------------
-// DADOS CALCULADOS: Estatísticas do dia do profissional
-// Em produção, virão da API com filtros por data e profissional
+// HELPERS
 // -------------------------------------------------------
-const todayVaccines   = mockVaccines.filter(v => v.status === 'complete').length; // Vacinas registradas
-const todayPatients   = 4;                                                         // Pacientes atendidos hoje
-const pendingAlerts   = mockVaccines.filter(v => v.status === 'overdue').length;  // Alertas de vacinas atrasadas
+/** Calcula o número de itens com estoque abaixo do mínimo */
+const lowStockCount = mockStock.filter(s => s.quantity < s.minLevel).length;
+/** Campanha ativa (primeiro mock) */
+const activeCampaign = mockCampaigns[0];
 
 // -------------------------------------------------------
-// DADOS: Configuração dos cards de estatísticas
-// -------------------------------------------------------
-const STAT_CARDS = [
-  { label: 'Pacientes Hoje',      value: todayPatients, icon: 'people',       color: Colors.PROFESSIONAL },
-  { label: 'Vacinas Registradas', value: todayVaccines, icon: 'medical',      color: Colors.PRIMARY },
-  { label: 'Alertas Pendentes',   value: pendingAlerts, icon: 'alert-circle', color: Colors.STATUS.OVERDUE },
-];
-
-// -------------------------------------------------------
-// COMPONENTE PRINCIPAL: Home do Profissional
+// COMPONENTE PRINCIPAL
 // -------------------------------------------------------
 export default function ProfessionalHome() {
-  return (
-    // Container principal com área segura
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Barra de status com ícones claros (fundo verde) */}
-      <StatusBar style="light" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+  // Lê o tipo de rede dos parâmetros de rota.
+  // Em produção virá do contexto de autenticação (auth context/store).
+  // Para testes: navigate para /(professional)/home?network=private
+  const params = useLocalSearchParams<{ network?: string }>();
+  const network = (params.network ?? 'public') as 'public' | 'private';
+  const isPublic  = network === 'public';
+  const isPrivate = network === 'private';
 
-        {/* ---- HEADER VERDE: Saudação + Badge de verificado + Avatar ---- */}
-        <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Olá, Dr(a). Marcos 👨‍⚕️</Text>
-            {/* Badge que indica que o profissional está verificado */}
-            <View style={styles.verifiedRow}>
-              <Ionicons name="shield-checkmark" size={14} color={Colors.LIGHT_GREEN} />
-              <Text style={styles.verifiedText}>Profissional Verificado</Text>
+  // Profissional mockado conforme a rede
+  const professional = isPublic ? mockProfessionalPublic : mockProfessionalPrivate;
+
+  // ── Handlers de navegação (todos usam ID) ────────────────
+
+  const goToSearch = () =>
+    router.push({ pathname: '/(professional)/search-patient', params: { network } });
+
+  const goToRegister = () =>
+    router.push({ pathname: '/(professional)/register-vaccine', params: { network } });
+
+  const goToPatientProfile = (patientId: string) =>
+    router.push({ pathname: '/(professional)/patient-profile', params: { patientId, network } });
+
+  // ── Dados calculados (virão da API futuramente) ──────────
+  // Mock: pacientes atendidos hoje (rede pública — futuramente: GET /stats/today)
+  const todayPatients = 7;
+  // Mock: "atendimentos concluídos" = appointments com status 'done'
+  const todayDone     = mockAppointments.filter(a => a.status === 'done').length;
+  // Mock: vacinas registradas hoje = igual aos atendimentos realizados (simplificado)
+  const todayVaccines = todayDone;
+
+  // ============================================================
+  // RENDER: Dashboard Rede Pública
+  // ============================================================
+  const PublicDashboard = () => (
+    <>
+      {/* ── STATS CARDS (flutuam sobre o header) ─────────── */}
+      <View style={styles.statsRow}>
+        {[
+          { icon: 'people',        value: todayPatients,     label: 'Pacientes\nHoje',      color: Colors.PROFESSIONAL, alert: false },
+          { icon: 'medical',       value: todayVaccines,     label: 'Vacinas\nRegistradas', color: Colors.PRIMARY,      alert: false },
+          { icon: 'megaphone',     value: mockCampaigns.length, label: 'Campanhas\nAtivas', color: Colors.STATUS.PENDING, alert: false },
+          { icon: 'warning',       value: lowStockCount,     label: 'Estoque\nBaixo',       color: Colors.STATUS.OVERDUE, alert: lowStockCount > 0 },
+        ].map((s, i) => (
+          <Animated.View key={s.label} entering={FadeInDown.delay(100 + i * 70).duration(400)} style={{ flex: 1 }}>
+            <StatCard
+              icon={s.icon as any}
+              value={s.value}
+              label={s.label}
+              color={s.color}
+              alert={s.alert}
+            />
+          </Animated.View>
+        ))}
+      </View>
+
+      {/* ── CAMPANHA ATIVA ───────────────────────────────── */}
+      {activeCampaign && (
+        <Animated.View entering={FadeInDown.delay(320).duration(400)} style={styles.campaignBanner}>
+          <View style={styles.campaignLeft}>
+            <View style={styles.campaignIconCircle}>
+              <Ionicons name="megaphone" size={20} color={Colors.STATUS.PENDING} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.campaignName} numberOfLines={1}>{activeCampaign.name}</Text>
+              <Text style={styles.campaignMeta}>
+                {activeCampaign.applied} / {activeCampaign.goal} doses · até {activeCampaign.deadline}
+              </Text>
+              {/* Barra de progresso */}
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${Math.min(100, (activeCampaign.applied / activeCampaign.goal) * 100)}%` },
+                  ]}
+                />
+              </View>
             </View>
           </View>
-          {/* Avatar clicável (futuramente abre as configurações) */}
-          <TouchableOpacity style={styles.avatar}>
-            <Ionicons name="person" size={24} color={Colors.PROFESSIONAL} />
-          </TouchableOpacity>
         </Animated.View>
+      )}
 
-        {/* ---- CARDS DE ESTATÍSTICAS DO DIA ---- */}
-        {/* Dispostos horizontalmente com fundo branco flutuando sobre o header */}
-        <View style={styles.statsRow}>
-          {STAT_CARDS.map((s, i) => (
-            <Animated.View key={s.label} entering={FadeInDown.delay(100 + i * 80).duration(400)} style={styles.statCard}>
-              {/* Círculo colorido com o ícone da estatística */}
-              <View style={[styles.statIconCircle, { backgroundColor: s.color + '20' }]}>
-                <Ionicons name={s.icon as any} size={22} color={s.color} />
-              </View>
-              {/* Valor numérico em destaque */}
-              <Text style={[styles.statNum, { color: s.color }]}>{s.value}</Text>
-              {/* Rótulo da estatística */}
-              <Text style={styles.statLabel}>{s.label}</Text>
-            </Animated.View>
-          ))}
+      {/* ── AÇÕES RÁPIDAS ────────────────────────────────── */}
+      <Animated.View entering={FadeInDown.delay(380).duration(400)} style={styles.section}>
+        <Text style={styles.sectionTitle}>Ações Rápidas</Text>
+        <View style={styles.actionsGrid}>
+          <QuickActionButton icon="add-circle" label="Registrar Vacina" onPress={goToRegister} highlight color={Colors.PROFESSIONAL} />
+          <QuickActionButton icon="time"       label="Histórico"        onPress={() => {}} />
+          <QuickActionButton icon="megaphone"  label="Campanhas"        onPress={() => {}} />
+          <QuickActionButton icon="cube"       label="Estoque"          onPress={() => {}} />
+        </View>
+      </Animated.View>
+
+      {/* ── ÚLTIMOS ATENDIMENTOS ─────────────────────────── */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Últimos Atendimentos</Text>
+          <TouchableOpacity onPress={() => router.push('/(professional)/patients')}>
+            <Text style={styles.sectionLink}>Ver todos</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* ---- BOTÃO DE ACESSO RÁPIDO: Registrar nova vacinação ---- */}
-        <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.registerBtnWrap}>
-          <TouchableOpacity style={styles.registerBtn} onPress={() => router.push('/(professional)/register-vaccine')}>
-            <Ionicons name="add-circle" size={22} color={Colors.NEUTRAL.WHITE} />
-            <Text style={styles.registerBtnText}>Registrar nova vacinação</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        {mockPatientProfiles.slice(0, 4).map((p, i) => (
+          <Animated.View key={p.id} entering={FadeInDown.delay(440 + i * 60).duration(350)}>
+            <PatientCard patient={p} onPress={goToPatientProfile} compact />
+          </Animated.View>
+        ))}
+      </View>
+    </>
+  );
 
-        {/* ---- SEÇÃO: Lista de Pacientes Recentes ---- */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pacientes Recentes</Text>
-          {/* Exibe os primeiros 4 pacientes da lista */}
-          {mockPatients.slice(0, 4).map((p, i) => (
-            <Animated.View key={p.id} entering={FadeInDown.delay(350 + i * 60).duration(350)} style={styles.patientRow}>
-              {/* Avatar circular com ícone de pessoa */}
-              <View style={styles.patientAvatar}>
-                <Ionicons name="person" size={22} color={Colors.NEUTRAL.WHITE} />
-              </View>
-              {/* Informações do paciente */}
-              <View style={styles.patientInfo}>
-                <Text style={styles.patientName}>{p.name}</Text>
-                <Text style={styles.patientMeta}>{p.lastVaccine} · {p.lastVaccineDate}</Text>
-              </View>
-              {/* Lado direito: badge de pendentes + botão de detalhe */}
-              <View style={styles.patientRight}>
-                {/* Badge vermelho de vacinas pendentes (aparece apenas se houver) */}
-                {p.pendingCount > 0 && (
-                  <View style={styles.alertBadge}>
-                    <Text style={styles.alertBadgeText}>{p.pendingCount} pendente{p.pendingCount > 1 ? 's' : ''}</Text>
-                  </View>
-                )}
-                {/* Botão de ver detalhes do paciente */}
-                <TouchableOpacity style={styles.actionBtn}>
-                  <Ionicons name="chevron-forward" size={18} color={Colors.PROFESSIONAL} />
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          ))}
+  // ============================================================
+  // RENDER: Dashboard Rede Privada
+  // ============================================================
+  const PrivateDashboard = () => (
+    <>
+      {/* ── AGENDA DO DIA ────────────────────────────────── */}
+      <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Agenda de Hoje</Text>
+          <View style={styles.agendaBadge}>
+            <Text style={styles.agendaBadgeText}>{mockAppointments.length} consultas</Text>
+          </View>
         </View>
 
-        {/* Espaço extra no final */}
-        <View style={{ height: 20 }} />
+        {mockAppointments.map((apt, i) => (
+          <Animated.View key={apt.id} entering={FadeInDown.delay(200 + i * 60).duration(350)}>
+            <AppointmentCard appointment={apt} onPress={goToPatientProfile} />
+          </Animated.View>
+        ))}
+      </Animated.View>
+
+      {/* ── BOTÃO: ATENDER SEM AGENDAMENTO ───────────────── */}
+      <Animated.View entering={FadeInDown.delay(520).duration(400)} style={styles.walkInWrap}>
+        <TouchableOpacity style={styles.walkInBtn} onPress={goToSearch} activeOpacity={0.85}>
+          <View style={styles.walkInIcon}>
+            <Ionicons name="person-add" size={22} color={Colors.PROFESSIONAL} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.walkInTitle}>Atender sem agendamento</Text>
+            <Text style={styles.walkInSub}>Buscar paciente por CPF, nome ou Nº SUS</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.PROFESSIONAL} />
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* ── AÇÕES RÁPIDAS (simplificadas para Rede Privada) ─ */}
+      <Animated.View entering={FadeInDown.delay(580).duration(400)} style={styles.section}>
+        <Text style={styles.sectionTitle}>Ações</Text>
+        <View style={styles.actionsRow}>
+          <QuickActionButton icon="add-circle" label="Registrar Vacina" onPress={goToRegister} highlight color={Colors.PROFESSIONAL} />
+          <QuickActionButton icon="time"       label="Histórico"        onPress={() => {}} />
+          <QuickActionButton icon="search"     label="Buscar Paciente"  onPress={goToSearch}  />
+        </View>
+      </Animated.View>
+    </>
+  );
+
+  // todayPatients declarado acima, junto aos demais dados calculados
+
+  // ============================================================
+  // RENDER PRINCIPAL
+  // ============================================================
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar style="light" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+
+        {/* ── HEADER ───────────────────────────────────────── */}
+        <Animated.View entering={FadeIn.duration(500)}>
+          <ProfessionalHeader
+            name={professional.name}
+            role={professional.role}
+            unit={isPublic ? professional.unit : (professional.institution ?? '')}
+            networkType={professional.networkType}
+            onAvatarPress={() => router.push('/(professional)/settings')}
+          />
+        </Animated.View>
+
+        {/* ── CONTEÚDO DO DASHBOARD ────────────────────────── */}
+        <View style={styles.body}>
+          {isPublic  && <PublicDashboard  />}
+          {isPrivate && <PrivateDashboard />}
+        </View>
+
+        <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 // -------------------------------------------------------
-// ESTILOS DA TELA
-// Identidade visual VERDE — área do profissional de saúde
+// ESTILOS
 // -------------------------------------------------------
 const styles = StyleSheet.create({
-  // === CONTAINER PRINCIPAL ===
-  safe:           { flex: 1, backgroundColor: Colors.BACKGROUND },
+  safe:         { flex: 1, backgroundColor: Colors.BACKGROUND },
+  scrollContent: { paddingBottom: 16 },
+  body:         { paddingHorizontal: 16 },
 
-  // === CABEÇALHO VERDE ===
-  header:         { backgroundColor: Colors.PROFESSIONAL, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 28, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  greeting:       { fontSize: 22, fontWeight: '800', color: Colors.NEUTRAL.WHITE },
-  verifiedRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  verifiedText:   { fontSize: 12, color: Colors.LIGHT_GREEN, fontWeight: '600' },
-  avatar:         { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.NEUTRAL.WHITE, alignItems: 'center', justifyContent: 'center' },
+  // Stats
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 0,
+    paddingBottom: 14,
+    marginTop: -34,
+  },
 
-  // === CARDS DE ESTATÍSTICAS (flutuam sobre o header) ===
-  statsRow:       { flexDirection: 'row', gap: 10, padding: 16, marginTop: -16 },
-  statCard:       { flex: 1, backgroundColor: Colors.NEUTRAL.WHITE, borderRadius: 16, padding: 14, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, elevation: 3 },
-  statIconCircle: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  statNum:        { fontSize: 22, fontWeight: '800' },
-  statLabel:      { fontSize: 10, color: Colors.NEUTRAL.MUTED, textAlign: 'center', marginTop: 2, fontWeight: '500' },
+  // Campanha
+  campaignBanner: {
+    backgroundColor: Colors.NEUTRAL.WHITE,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.STATUS.PENDING,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  campaignLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  campaignIconCircle: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: Colors.STATUS.PENDING + '20',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  campaignName: { fontSize: 13, fontWeight: '700', color: Colors.NEUTRAL.DARK_TEXT, marginBottom: 3 },
+  campaignMeta: { fontSize: 11, color: Colors.NEUTRAL.MUTED, marginBottom: 6 },
+  progressBar:  { height: 5, backgroundColor: Colors.BORDER, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: Colors.STATUS.PENDING, borderRadius: 3 },
 
-  // === BOTÃO DE REGISTRAR VACINAÇÃO ===
-  registerBtnWrap:{ paddingHorizontal: 16, marginBottom: 20 },
-  registerBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: Colors.PROFESSIONAL, height: 54, borderRadius: 14, shadowColor: Colors.PROFESSIONAL, shadowOpacity: 0.35, shadowRadius: 8, elevation: 5 },
-  registerBtnText:{ fontSize: 16, fontWeight: '700', color: Colors.NEUTRAL.WHITE },
+  // Seções
+  section:       { marginBottom: 20 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  sectionTitle:  { fontSize: 17, fontWeight: '800', color: Colors.NEUTRAL.DARK_TEXT },
+  sectionLink:   { fontSize: 13, fontWeight: '600', color: Colors.PROFESSIONAL },
 
-  // === SEÇÃO DE PACIENTES ===
-  section:        { paddingHorizontal: 16 },
-  sectionTitle:   { fontSize: 17, fontWeight: '800', color: Colors.NEUTRAL.DARK_TEXT, marginBottom: 14 },
+  // Grid de ações (Rede Pública)
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
 
-  // === LINHA DE PACIENTE ===
-  patientRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.NEUTRAL.WHITE, borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
-  patientAvatar:  { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.PROFESSIONAL, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  patientInfo:    { flex: 1 },
-  patientName:    { fontSize: 14, fontWeight: '700', color: Colors.NEUTRAL.DARK_TEXT },
-  patientMeta:    { fontSize: 12, color: Colors.NEUTRAL.MUTED, marginTop: 2 },
-  patientRight:   { alignItems: 'flex-end', gap: 4 },
-  alertBadge:     { backgroundColor: Colors.STATUS.OVERDUE + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  alertBadgeText: { fontSize: 10, color: Colors.STATUS.OVERDUE, fontWeight: '700' },
-  actionBtn:      {},
+  // Row de ações (Rede Privada)
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+
+  // Agenda badge
+  agendaBadge: {
+    backgroundColor: Colors.PROFESSIONAL_LIGHT,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.LIGHT_GREEN,
+  },
+  agendaBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.PROFESSIONAL },
+
+  // Walk-in button (Atender sem agendamento)
+  walkInWrap: { marginBottom: 20 },
+  walkInBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: Colors.NEUTRAL.WHITE,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: Colors.PROFESSIONAL,
+    shadowColor: Colors.PROFESSIONAL,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  walkInIcon: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: Colors.PROFESSIONAL_LIGHT,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  walkInTitle: { fontSize: 15, fontWeight: '800', color: Colors.PROFESSIONAL },
+  walkInSub:   { fontSize: 12, color: Colors.NEUTRAL.MUTED, marginTop: 2 },
 });
