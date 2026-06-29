@@ -34,14 +34,14 @@
 // ROTA: /app/(professional)/register-vaccine.tsx
 // ============================================================
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert, KeyboardAvoidingView, Platform,
   ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
@@ -49,6 +49,11 @@ import { InputField } from '../../components/InputField';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { availableVaccines, availableManufacturers, mockPatientProfiles } from '../../constants/MockData';
 import { PatientContextCard, SuccessModal } from '../../components/professional';
+import {
+  getPublicVaccinationQueue,
+  removePublicQueuePatient,
+} from '../../services/PublicQueueStore';
+import type { PublicQueuePatient } from '../../services/PublicQueueStore';
 
 // -------------------------------------------------------
 // Sub-componente: Seletor tipo dropdown
@@ -111,12 +116,32 @@ const dd = StyleSheet.create({
 // COMPONENTE PRINCIPAL
 // -------------------------------------------------------
 export default function RegisterVaccineScreen() {
-  const params    = useLocalSearchParams<{ patientId?: string; network?: string }>();
+  const params    = useLocalSearchParams<{ patientId?: string; network?: string; queueId?: string }>();
   const initialPatientId = params.patientId;
   const network   = params.network ?? 'public';
+  const initialQueueId = params.queueId;
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(initialPatientId);
+  const [activeQueueId, setActiveQueueId] = useState<string | undefined>(
+    initialQueueId ? String(initialQueueId) : undefined
+  );
+  const [publicQueue, setPublicQueue] = useState<PublicQueuePatient[]>(getPublicVaccinationQueue());
   const [susSearch, setSusSearch] = useState('');
   const [susSearchError, setSusSearchError] = useState('');
+
+  useFocusEffect(
+    useCallback(() => {
+      setPublicQueue(getPublicVaccinationQueue());
+    }, [])
+  );
+
+  useEffect(() => {
+    if (initialPatientId) {
+      setSelectedPatientId(String(initialPatientId));
+      setActiveQueueId(initialQueueId ? String(initialQueueId) : undefined);
+      setSusSearch('');
+      setSusSearchError('');
+    }
+  }, [initialPatientId, initialQueueId]);
 
   // Busca o perfil do paciente pelo ID
   // Futuramente: GET /patients/{patientId}/profile
@@ -179,6 +204,31 @@ export default function RegisterVaccineScreen() {
     setSusSearchError('');
   };
 
+  const handleStartQueuedPatient = (item: PublicQueuePatient) => {
+    setSelectedPatientId(item.patient.id);
+    setActiveQueueId(item.id);
+    setSusSearch('');
+    setSusSearchError('');
+  };
+
+  const handleBackToQueue = () => {
+    setSelectedPatientId(undefined);
+    setActiveQueueId(undefined);
+    setPublicQueue(getPublicVaccinationQueue());
+  };
+
+  const resetForm = () => {
+    setVaccine('');
+    setDose('');
+    setManufacturer('');
+    setLot('');
+    setDate('');
+    setLocation('');
+    setNotes('');
+    setShowVaccine(false);
+    setShowManufacturer(false);
+  };
+
   // ── Validação e envio ────────────────────────────────────
   const handleSubmit = () => {
     if (!patient) {
@@ -213,6 +263,18 @@ export default function RegisterVaccineScreen() {
   // ── Ao fechar o modal, volta para o perfil do paciente ──
   const handleSuccessDismiss = () => {
     setShowSuccess(false);
+    if (activeQueueId) {
+      removePublicQueuePatient(activeQueueId);
+      setPublicQueue(getPublicVaccinationQueue());
+    }
+
+    if (!initialPatientId && network === 'public') {
+      resetForm();
+      setSelectedPatientId(undefined);
+      setActiveQueueId(undefined);
+      return;
+    }
+
     router.back();
   };
 
@@ -239,7 +301,54 @@ export default function RegisterVaccineScreen() {
         >
 
           {/* ── CARTÃO FIXO DO PACIENTE ──────────────────── */}
-          {!patient && (
+          {!patient && network === 'public' && (
+            <Animated.View entering={FadeInDown.delay(80).duration(400)} style={styles.queuePanel}>
+              <View style={styles.queuePanelHeader}>
+                <View>
+                  <Text style={styles.queueTitle}>Fila de Vacinação</Text>
+                  <Text style={styles.queueSubtitle}>Selecione um paciente triado para registrar a vacina.</Text>
+                </View>
+                <View style={styles.queueBadge}>
+                  <Text style={styles.queueBadgeText}>{publicQueue.length} na fila</Text>
+                </View>
+              </View>
+
+              {publicQueue.length === 0 ? (
+                <View style={styles.emptyQueue}>
+                  <Ionicons name="people-outline" size={26} color={Colors.NEUTRAL.MUTED} />
+                  <Text style={styles.emptyQueueTitle}>Fila vazia</Text>
+                  <Text style={styles.emptyQueueText}>A recepção ainda não encaminhou pacientes para vacinação.</Text>
+                </View>
+              ) : (
+                publicQueue.map((item, i) => (
+                  <Animated.View key={item.id} entering={FadeInDown.delay(120 + i * 55).duration(350)} style={styles.queueItem}>
+                    <View style={styles.queuePosition}>
+                      <Text style={styles.queuePositionText}>{item.position}</Text>
+                    </View>
+                    <View style={styles.queuePatientInfo}>
+                      <Text style={styles.queuePatientName} numberOfLines={1}>{item.patient.name}</Text>
+                      <Text style={styles.queuePatientMeta}>
+                        {item.arrivalTime} · {item.reason} · {item.patient.age} anos
+                      </Text>
+                      {item.patient.pendingCount > 0 && (
+                        <Text style={styles.queuePending}>{item.patient.pendingCount} pendência(s) no calendário</Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.startCareBtn}
+                      onPress={() => handleStartQueuedPatient(item)}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="play" size={14} color={Colors.NEUTRAL.WHITE} />
+                      <Text style={styles.startCareText}>Iniciar</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))
+              )}
+            </Animated.View>
+          )}
+
+          {!patient && network !== 'public' && (
             <Animated.View entering={FadeInDown.delay(80).duration(400)} style={styles.identificationCard}>
               <View style={styles.identificationIcon}>
                 <Ionicons name="card-outline" size={24} color={Colors.PROFESSIONAL} />
@@ -268,10 +377,10 @@ export default function RegisterVaccineScreen() {
           {patient && (
             <Animated.View entering={FadeInDown.delay(80).duration(400)}>
               <PatientContextCard patient={patient} />
-              {!initialPatientId && (
-                <TouchableOpacity style={styles.changePatientBtn} onPress={() => setSelectedPatientId(undefined)}>
+              {network === 'public' && (
+                <TouchableOpacity style={styles.changePatientBtn} onPress={handleBackToQueue}>
                   <Ionicons name="swap-horizontal-outline" size={16} color={Colors.PROFESSIONAL} />
-                  <Text style={styles.changePatientText}>Trocar paciente</Text>
+                  <Text style={styles.changePatientText}>Voltar para fila</Text>
                 </TouchableOpacity>
               )}
             </Animated.View>
@@ -406,6 +515,126 @@ const styles = StyleSheet.create({
 
   // Conteúdo
   content: { padding: 16 },
+
+  queuePanel: {
+    backgroundColor: Colors.NEUTRAL.WHITE,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  queuePanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 14,
+  },
+  queueTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.NEUTRAL.DARK_TEXT,
+  },
+  queueSubtitle: {
+    fontSize: 13,
+    color: Colors.NEUTRAL.MUTED,
+    lineHeight: 19,
+    marginTop: 3,
+  },
+  queueBadge: {
+    backgroundColor: Colors.PROFESSIONAL_LIGHT,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: Colors.LIGHT_GREEN,
+    flexShrink: 0,
+  },
+  queueBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.PROFESSIONAL,
+  },
+  emptyQueue: {
+    alignItems: 'center',
+    backgroundColor: Colors.CARD_BG,
+    borderRadius: 14,
+    padding: 22,
+  },
+  emptyQueueTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Colors.NEUTRAL.DARK_TEXT,
+    marginTop: 8,
+  },
+  emptyQueueText: {
+    fontSize: 13,
+    color: Colors.NEUTRAL.MUTED,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  queueItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Colors.CARD_BG,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+  },
+  queuePosition: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.PROFESSIONAL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  queuePositionText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Colors.NEUTRAL.WHITE,
+  },
+  queuePatientInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  queuePatientName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.NEUTRAL.DARK_TEXT,
+  },
+  queuePatientMeta: {
+    fontSize: 11,
+    color: Colors.NEUTRAL.MUTED,
+    marginTop: 2,
+  },
+  queuePending: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.STATUS.PENDING,
+    marginTop: 3,
+  },
+  startCareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.PROFESSIONAL,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexShrink: 0,
+  },
+  startCareText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.NEUTRAL.WHITE,
+  },
 
   identificationCard: {
     backgroundColor: Colors.NEUTRAL.WHITE,

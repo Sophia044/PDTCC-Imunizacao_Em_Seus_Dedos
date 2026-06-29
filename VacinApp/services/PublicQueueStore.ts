@@ -31,6 +31,13 @@ let publicVaccinationQueue: PublicQueueItem[] = [
     reason: 'Dose pendente',
     status: 'waiting',
   },
+  {
+    id: 'queue-003',
+    patientId: '1',
+    arrivalTime: '08:40',
+    reason: 'Campanha de Influenza',
+    status: 'waiting',
+  },
 ];
 
 const buildQueuePatients = (): PublicQueuePatient[] =>

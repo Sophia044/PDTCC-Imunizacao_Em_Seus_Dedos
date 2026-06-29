@@ -232,8 +232,25 @@ export default function WelcomeScreen() {
             />
           </Animated.View>
 
+          <View style={{ height: 14 }} />
+
+          <Animated.View entering={FadeInDown.delay(610).duration(600)}>
+            <ProfileCard
+              icon="business"
+              iconBg={Colors.PROFESSIONAL_LIGHT}
+              iconColor={Colors.PROFESSIONAL}
+              title="Entrar como Unidade de Saúde"
+              description="Acesso institucional para recepção e triagem de pacientes da rede pública."
+              accentColor={Colors.PROFESSIONAL}
+              borderColor={Colors.BORDER}
+              shadowColor={Colors.PROFESSIONAL}
+              onPress={() => router.push('/(auth)/login-unit')}
+              accessibilityLabel="Entrar como Unidade de Saúde"
+            />
+          </Animated.View>
+
           {/* ---- LINK DE CADASTRO ---- */}
-          <Animated.View entering={FadeInUp.delay(660).duration(500)} style={styles.registerRow}>
+          <Animated.View entering={FadeInUp.delay(720).duration(500)} style={styles.registerRow}>
             <Text style={styles.registerText}>Não possui conta?</Text>
             <TouchableOpacity
               onPress={() => router.push('/(auth)/choose-registration')}
@@ -246,7 +263,7 @@ export default function WelcomeScreen() {
           </Animated.View>
 
           {/* ---- RODAPÉ INSTITUCIONAL ---- */}
-          <Animated.View entering={FadeIn.delay(750).duration(500)} style={styles.footer}>
+          <Animated.View entering={FadeIn.delay(800).duration(500)} style={styles.footer}>
             <Ionicons name="lock-closed-outline" size={12} color={Colors.NEUTRAL.MUTED} />
             <Text style={styles.footerText}>Dados protegidos pela LGPD</Text>
           </Animated.View>

@@ -37,6 +37,8 @@ export default function RootLayout() {
         <Stack.Screen name="(patient)" />
         {/* Grupo de telas do profissional: home, pacientes, registrar, configurações */}
         <Stack.Screen name="(professional)" />
+        {/* Grupo de telas institucionais: unidade de saúde e triagem pública */}
+        <Stack.Screen name="(unit)" />
       </Stack>
     </GestureHandlerRootView>
   );

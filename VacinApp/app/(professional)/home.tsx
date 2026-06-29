@@ -23,13 +23,13 @@
 // ROTA: /app/(professional)/home.tsx
 // ============================================================
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
@@ -38,18 +38,18 @@ import { Colors } from '../../constants/Colors';
 import {
   mockProfessionalPublic,
   mockProfessionalPrivate,
-  mockPatientProfiles,
   mockAppointments,
   mockCampaigns,
   mockStock,
 } from '../../constants/MockData';
+import { getPublicVaccinationQueue } from '../../services/PublicQueueStore';
+import type { PublicQueuePatient } from '../../services/PublicQueueStore';
 
 // ── Componentes reutilizáveis ──────────────────────────────
 import {
   ProfessionalHeader,
   StatCard,
   QuickActionButton,
-  PatientCard,
   AppointmentCard,
 } from '../../components/professional';
 
@@ -75,6 +75,13 @@ export default function ProfessionalHome() {
 
   // Profissional mockado conforme a rede
   const professional = isPublic ? mockProfessionalPublic : mockProfessionalPrivate;
+  const [publicQueue, setPublicQueue] = useState<PublicQueuePatient[]>(getPublicVaccinationQueue());
+
+  useFocusEffect(
+    useCallback(() => {
+      setPublicQueue(getPublicVaccinationQueue());
+    }, [])
+  );
 
   // ── Handlers de navegação (todos usam ID) ────────────────
 
@@ -86,6 +93,12 @@ export default function ProfessionalHome() {
 
   const goToPatientProfile = (patientId: string) =>
     router.push({ pathname: '/(professional)/patient-profile', params: { patientId, network } });
+
+  const goToQueuedPatientRegister = (item: PublicQueuePatient) =>
+    router.push({
+      pathname: '/(professional)/register-vaccine',
+      params: { patientId: item.patient.id, network, queueId: item.id },
+    });
 
   // ── Dados calculados (virão da API futuramente) ──────────
   // Mock: pacientes atendidos hoje (rede pública — futuramente: GET /stats/today)
@@ -157,21 +170,45 @@ export default function ProfessionalHome() {
         </View>
       </Animated.View>
 
-      {/* ── ÚLTIMOS ATENDIMENTOS ─────────────────────────── */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Últimos Atendimentos</Text>
-          <TouchableOpacity onPress={() => router.push('/(professional)/patients')}>
-            <Text style={styles.sectionLink}>Ver todos</Text>
-          </TouchableOpacity>
+      <Animated.View entering={FadeInDown.delay(430).duration(400)} style={styles.queuePanel}>
+        <View style={styles.queuePanelHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Fila de Vacinação</Text>
+            <Text style={styles.queueSubtitle}>Pacientes triados pela recepção da unidade</Text>
+          </View>
+          <View style={styles.queueBadge}>
+            <Text style={styles.queueBadgeText}>{publicQueue.length} na fila</Text>
+          </View>
         </View>
 
-        {mockPatientProfiles.slice(0, 4).map((p, i) => (
-          <Animated.View key={p.id} entering={FadeInDown.delay(440 + i * 60).duration(350)}>
-            <PatientCard patient={p} onPress={goToPatientProfile} compact />
-          </Animated.View>
-        ))}
-      </View>
+        {publicQueue.length === 0 ? (
+          <View style={styles.emptyQueue}>
+            <Ionicons name="people-outline" size={24} color={Colors.NEUTRAL.MUTED} />
+            <Text style={styles.emptyQueueText}>Nenhum paciente aguardando vacinação.</Text>
+          </View>
+        ) : (
+          publicQueue.slice(0, 3).map((item, i) => (
+            <Animated.View key={item.id} entering={FadeInDown.delay(480 + i * 60).duration(350)} style={styles.queueItem}>
+              <View style={styles.queuePosition}>
+                <Text style={styles.queuePositionText}>{item.position}</Text>
+              </View>
+              <View style={styles.queuePatientInfo}>
+                <Text style={styles.queuePatientName} numberOfLines={1}>{item.patient.name}</Text>
+                <Text style={styles.queuePatientMeta}>
+                  {item.arrivalTime} · {item.reason} · {item.patient.age} anos
+                </Text>
+                {item.patient.pendingCount > 0 && (
+                  <Text style={styles.queuePending}>{item.patient.pendingCount} pendência(s) no calendário</Text>
+                )}
+              </View>
+              <TouchableOpacity style={styles.startCareBtn} onPress={() => goToQueuedPatientRegister(item)} activeOpacity={0.85}>
+                <Ionicons name="play" size={14} color={Colors.NEUTRAL.WHITE} />
+                <Text style={styles.startCareText}>Iniciar</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ))
+        )}
+      </Animated.View>
     </>
   );
 
@@ -270,7 +307,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 0,
     paddingBottom: 14,
-    marginTop: -34,
+    marginTop: -6,
   },
 
   // Campanha
@@ -314,6 +351,113 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+
+  // Fila pública
+  queuePanel: {
+    backgroundColor: Colors.NEUTRAL.WHITE,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  queuePanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 12,
+  },
+  queueSubtitle: {
+    fontSize: 12,
+    color: Colors.NEUTRAL.MUTED,
+    marginTop: 2,
+  },
+  queueBadge: {
+    backgroundColor: Colors.PROFESSIONAL_LIGHT,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: Colors.LIGHT_GREEN,
+  },
+  queueBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.PROFESSIONAL,
+  },
+  emptyQueue: {
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.CARD_BG,
+    borderRadius: 14,
+    padding: 18,
+  },
+  emptyQueueText: {
+    fontSize: 13,
+    color: Colors.NEUTRAL.MUTED,
+    textAlign: 'center',
+  },
+  queueItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Colors.CARD_BG,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+  },
+  queuePosition: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Colors.PROFESSIONAL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  queuePositionText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.NEUTRAL.WHITE,
+  },
+  queuePatientInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  queuePatientName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.NEUTRAL.DARK_TEXT,
+  },
+  queuePatientMeta: {
+    fontSize: 11,
+    color: Colors.NEUTRAL.MUTED,
+    marginTop: 2,
+  },
+  queuePending: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.STATUS.PENDING,
+    marginTop: 3,
+  },
+  startCareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.PROFESSIONAL,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexShrink: 0,
+  },
+  startCareText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.NEUTRAL.WHITE,
   },
 
   // Agenda badge
