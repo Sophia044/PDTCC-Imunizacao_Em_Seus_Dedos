@@ -101,10 +101,12 @@ export default function ProfessionalHome() {
     });
 
   // ── Dados calculados (virão da API futuramente) ──────────
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayAppointments = mockAppointments.filter(a => a.date === todayStr);
   // Mock: pacientes atendidos hoje (rede pública — futuramente: GET /stats/today)
   const todayPatients = 7;
-  // Mock: "atendimentos concluídos" = appointments com status 'done'
-  const todayDone     = mockAppointments.filter(a => a.status === 'done').length;
+  // Mock: "atendimentos concluídos" = appointments de hoje com status 'done'
+  const todayDone     = todayAppointments.filter(a => a.status === 'done').length;
   // Mock: vacinas registradas hoje = igual aos atendimentos realizados (simplificado)
   const todayVaccines = todayDone;
 
@@ -222,11 +224,11 @@ export default function ProfessionalHome() {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Agenda de Hoje</Text>
           <View style={styles.agendaBadge}>
-            <Text style={styles.agendaBadgeText}>{mockAppointments.length} consultas</Text>
+            <Text style={styles.agendaBadgeText}>{todayAppointments.length} consultas</Text>
           </View>
         </View>
 
-        {mockAppointments.map((apt, i) => (
+        {todayAppointments.map((apt, i) => (
           <Animated.View key={apt.id} entering={FadeInDown.delay(200 + i * 60).duration(350)}>
             <AppointmentCard appointment={apt} onPress={goToPatientProfile} />
           </Animated.View>

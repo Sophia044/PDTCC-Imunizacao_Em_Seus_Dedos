@@ -91,6 +91,7 @@ export interface ProfessionalUser {
 // -------------------------------------------------------
 export interface AppointmentItem {
   id: string;            // ID único do agendamento
+  date: string;          // Data do agendamento (formato YYYY-MM-DD)
   time: string;          // Horário formatado (ex: "08:30")
   patientId: string;     // ID do paciente — usado para navegar ao perfil
   patientName: string;   // Nome do paciente
@@ -273,15 +274,32 @@ export const mockProfessionalPrivate: ProfessionalUser = {
   institution: 'Clínica Vida Saúde',
 };
 
-// ── Agenda do dia (Rede Privada) ─────────────────────────────────────────
-// Futuramente retornado por GET /professional/appointments?date=today
+// Helper para gerar datas ISO relativas (para testes de calendário)
+const getIsoDate = (offsetDays: number = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().split('T')[0];
+};
+
+export const TODAY_ISO = getIsoDate(0);
+export const TOMORROW_ISO = getIsoDate(1);
+export const YESTERDAY_ISO = getIsoDate(-1);
+export const IN_2_DAYS_ISO = getIsoDate(2);
+
+// ── Agenda da Rede Privada (Agendamentos) ─────────────────────────────────
+// Futuramente retornado por GET /professional/appointments?date={date}
 export const mockAppointments: AppointmentItem[] = [
-  { id: 'apt-1', time: '08:00', patientId: '1', patientName: 'Ana Clara Souza',     vaccine: 'Influenza',          plan: 'Unimed',           status: 'done'      },
-  { id: 'apt-2', time: '09:30', patientId: '5', patientName: 'Fernanda Costa',      vaccine: 'Influenza',          plan: 'SulAmérica',       status: 'scheduled' },
-  { id: 'apt-3', time: '10:00', patientId: '2', patientName: 'Carlos Eduardo Lima', vaccine: 'Tétano (dT)',        plan: 'SUS',              status: 'scheduled' },
-  { id: 'apt-4', time: '11:30', patientId: '3', patientName: 'Mariana Ferreira',    vaccine: 'COVID-19 (Reforço)', plan: 'Bradesco Saúde',   status: 'scheduled' },
-  { id: 'apt-5', time: '14:00', patientId: '4', patientName: 'João Pedro Alves',    vaccine: 'HPV 2ª Dose',        plan: 'SUS',              status: 'missed'    },
+  { id: 'apt-1', date: TODAY_ISO,     time: '08:00', patientId: '1', patientName: 'Ana Clara Souza',     vaccine: 'Influenza',          plan: 'Unimed',           status: 'done'      },
+  { id: 'apt-2', date: TODAY_ISO,     time: '09:30', patientId: '5', patientName: 'Fernanda Costa',      vaccine: 'Influenza',          plan: 'SulAmérica',       status: 'scheduled' },
+  { id: 'apt-3', date: TODAY_ISO,     time: '10:00', patientId: '2', patientName: 'Carlos Eduardo Lima', vaccine: 'Tétano (dT)',        plan: 'SUS',              status: 'scheduled' },
+  { id: 'apt-4', date: TODAY_ISO,     time: '11:30', patientId: '3', patientName: 'Mariana Ferreira',    vaccine: 'COVID-19 (Reforço)', plan: 'Bradesco Saúde',   status: 'scheduled' },
+  { id: 'apt-5', date: TODAY_ISO,     time: '14:00', patientId: '4', patientName: 'João Pedro Alves',    vaccine: 'HPV 2ª Dose',        plan: 'SUS',              status: 'missed'    },
+  { id: 'apt-6', date: TOMORROW_ISO,  time: '09:00', patientId: '1', patientName: 'Ana Clara Souza',     vaccine: 'Hepatite B',         plan: 'Unimed',           status: 'scheduled' },
+  { id: 'apt-7', date: TOMORROW_ISO,  time: '10:30', patientId: '3', patientName: 'Mariana Ferreira',    vaccine: 'Febre Amarela',      plan: 'Bradesco Saúde',   status: 'scheduled' },
+  { id: 'apt-8', date: IN_2_DAYS_ISO, time: '14:30', patientId: '5', patientName: 'Fernanda Costa',      vaccine: 'Dengue (Qdenga)',    plan: 'SulAmérica',       status: 'scheduled' },
+  { id: 'apt-9', date: YESTERDAY_ISO, time: '11:00', patientId: '2', patientName: 'Carlos Eduardo Lima', vaccine: 'Tríplice Viral',     plan: 'SUS',              status: 'done'      },
 ];
+
 
 // ── Campanhas vacinais ativas ─────────────────────────────────────────────
 // Futuramente retornado por GET /campaigns?unit={unitId}&status=active

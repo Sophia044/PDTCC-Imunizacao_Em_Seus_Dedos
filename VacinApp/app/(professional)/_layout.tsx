@@ -75,6 +75,14 @@ export default function ProfessionalLayout() {
       />
 
       <Tabs.Screen
+        name="agenda"
+        options={{
+          title: 'Agenda',
+          tabBarIcon: ({ color, focused }) => <TabIcon name="calendar" color={color} focused={focused} />,
+        }}
+      />
+
+      <Tabs.Screen
         name="patients"
         options={{
           title: 'Pacientes',
