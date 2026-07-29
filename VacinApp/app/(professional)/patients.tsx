@@ -9,16 +9,19 @@
 // ============================================================
 
 // --- Bibliotecas principais do React ---
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 // --- Componentes de layout e interação do React Native ---
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // --- Animações com Reanimated ---
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 // --- Área segura (evita sobreposição com status bar e notch) ---
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// --- Navegação ---
+import { router, useFocusEffect } from 'expo-router';
 
 // --- Controle da barra de status do sistema operacional ---
 import { StatusBar } from 'expo-status-bar';
@@ -29,22 +32,46 @@ import { Ionicons } from '@expo/vector-icons';
 // --- Paleta de cores oficial do VacinApp ---
 import { Colors } from '../../constants/Colors';
 
-// --- Dados mockados (simulam retorno de API) ---
-import { mockPatients } from '../../constants/MockData';
+// --- Tipos ---
+import type { Patient } from '../../constants/MockData';
+
+// --- Sessão do profissional autenticado ---
+import { useAuth } from '../../contexts/AuthContext';
+
+// --- API real ---
+import { listPatients } from '../../services/api/patients';
 
 // -------------------------------------------------------
 // COMPONENTE PRINCIPAL: Tela de Lista de Pacientes
 // -------------------------------------------------------
 export default function PatientsScreen() {
+  const { professional } = useAuth();
+  const network = professional?.networkType ?? 'public';
+
   // Estado que armazena o texto digitado na barra de busca
   const [query, setQuery] = useState('');
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Filtra os pacientes com base no texto digitado
-  // Busca por nome (case insensitive) ou por CPF
-  const filtered = mockPatients.filter(p =>
-    p.name.toLowerCase().includes(query.toLowerCase()) ||
-    p.cpf.includes(query)
-  );
+  const loadPatients = useCallback((search?: string) => {
+    setLoading(true);
+    listPatients(search)
+      .then(setPatients)
+      .catch(() => setPatients([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Recarrega a lista sempre que a tela ganha foco (ex.: após registrar uma vacina)
+  useFocusEffect(useCallback(() => { loadPatients(query); }, [loadPatients]));
+
+  // Busca com pequeno atraso (debounce) para não disparar uma requisição a cada tecla
+  useEffect(() => {
+    const timer = setTimeout(() => loadPatients(query), 350);
+    return () => clearTimeout(timer);
+  }, [query, loadPatients]);
+
+  const goToPatientProfile = (patientId: string) =>
+    router.push({ pathname: '/(professional)/patient-profile', params: { patientId, network } });
 
   return (
     // Container principal com área segura
@@ -54,7 +81,7 @@ export default function PatientsScreen() {
       {/* ---- CABEÇALHO: Título e contagem de pacientes ---- */}
       <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
         <Text style={styles.title}>Meus Pacientes</Text>
-        <Text style={styles.subtitle}>{mockPatients.length} pacientes cadastrados</Text>
+        <Text style={styles.subtitle}>{patients.length} pacientes cadastrados</Text>
       </Animated.View>
 
       {/* ---- BARRA DE BUSCA ---- */}
@@ -67,11 +94,15 @@ export default function PatientsScreen() {
           value={query}
           onChangeText={setQuery}
         />
+        {loading && <ActivityIndicator size="small" color={Colors.PROFESSIONAL} />}
       </Animated.View>
 
       {/* ---- LISTA DE PACIENTES ---- */}
       <ScrollView style={styles.list} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16 }}>
-        {filtered.map((p, i) => (
+        {!loading && patients.length === 0 && (
+          <Text style={styles.emptyText}>Nenhum paciente encontrado.</Text>
+        )}
+        {patients.map((p, i) => (
           <Animated.View key={p.id} entering={FadeInDown.delay(150 + i * 70).duration(350)} style={styles.card}>
             {/* Lado esquerdo: avatar + dados do paciente */}
             <View style={styles.cardLeft}>
@@ -99,7 +130,7 @@ export default function PatientsScreen() {
                 </View>
               )}
               {/* Botão para ver detalhes do paciente */}
-              <TouchableOpacity style={styles.viewBtn}>
+              <TouchableOpacity style={styles.viewBtn} onPress={() => goToPatientProfile(p.id)}>
                 <Text style={styles.viewBtnText}>Ver</Text>
                 <Ionicons name="chevron-forward" size={14} color={Colors.PROFESSIONAL} />
               </TouchableOpacity>
@@ -131,6 +162,7 @@ const styles = StyleSheet.create({
 
   // === LISTA ===
   list:         { flex: 1 },
+  emptyText:    { fontSize: 13, color: Colors.NEUTRAL.MUTED, textAlign: 'center', marginTop: 30 },
 
   // === CARD DO PACIENTE ===
   card:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.NEUTRAL.WHITE, borderRadius: 16, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },

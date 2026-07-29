@@ -22,7 +22,7 @@
 
 import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView, Platform, ScrollView,
+  Alert, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, Layout } from 'react-native-reanimated';
@@ -32,6 +32,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
 import { InputField } from '../../components/InputField';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { useAuth } from '../../contexts/AuthContext';
+import { ApiError } from '../../services/api/client';
 
 // --- Componentes reutilizáveis de autenticação ---
 import { AuthSegmentSelector, AuthContextMessage } from '../../components/auth';
@@ -82,6 +84,9 @@ export default function LoginUserScreen() {
   const [networkType, setNetworkType] = useState<NetworkType>('sus');
   const [cpf,         setCpf]         = useState('');
   const [password,    setPassword]    = useState('');
+  const [loading,     setLoading]     = useState(false);
+
+  const { loginPatient } = useAuth();
 
   // ── Flags derivadas do estado ──
   const isPrivate = networkType === 'private';
@@ -97,19 +102,22 @@ export default function LoginUserScreen() {
   };
 
   // ── Handler: login ──
-  const handleLogin = () => {
-    // Monta o payload exatamente como será enviado à API
-    const payload: PatientLoginPayload = {
-      cpf,
-      password,
-      networkType,
-    };
+  const handleLogin = async () => {
+    if (!cpf || !password) {
+      Alert.alert('Preencha os campos', 'Informe CPF e senha para continuar.');
+      return;
+    }
 
-    // TODO: Integrar com endpoint de autenticação do paciente
-    // Exemplo: await api.post('/auth/patient/login', payload);
-    console.log('Login Paciente (payload pronto para API):', payload);
-
-    router.replace('/(patient)/home');
+    setLoading(true);
+    try {
+      await loginPatient(cpf.replace(/\D/g, ''), password, networkType);
+      router.replace('/(patient)/home');
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Não foi possível entrar. Tente novamente.';
+      Alert.alert('Erro ao entrar', message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -213,9 +221,10 @@ export default function LoginUserScreen() {
         {/* ---- BOTÃO ENTRAR ---- */}
         <Animated.View entering={FadeInDown.delay(460).duration(600)}>
           <PrimaryButton
-            label="Entrar"
+            label={loading ? 'Entrando...' : 'Entrar'}
             onPress={handleLogin}
             variant={isPrivate ? 'professional' : 'primary'}
+            disabled={loading}
           />
         </Animated.View>
 

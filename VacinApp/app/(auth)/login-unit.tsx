@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -15,26 +16,37 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
 import { InputField } from '../../components/InputField';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { useAuth } from '../../contexts/AuthContext';
+import { ApiError } from '../../services/api/client';
 
 export default function LoginUnitScreen() {
   const [cnes, setCnes] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const { loginUnit } = useAuth();
 
   const handleCnes = (text: string) => {
     setCnes(text.replace(/\D/g, '').slice(0, 7));
   };
 
-  const handleLogin = () => {
-    const payload = {
-      cnes,
-      identifier,
-      password,
-      accessProfile: 'public_unit_triage',
-    };
+  const handleLogin = async () => {
+    if (!cnes || !identifier || !password) {
+      Alert.alert('Preencha os campos', 'Informe CNES, matrícula/e-mail e senha.');
+      return;
+    }
 
-    console.log('Login Unidade de Saúde (payload pronto para API):', payload);
-    router.replace('/(unit)/triage');
+    setLoading(true);
+    try {
+      await loginUnit({ cnes, identifier, password });
+      router.replace('/(unit)/triage');
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Não foi possível entrar. Tente novamente.';
+      Alert.alert('Erro ao entrar', message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -100,7 +112,7 @@ export default function LoginUnitScreen() {
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(400).duration(550)}>
-          <PrimaryButton label="Entrar na triagem" onPress={handleLogin} variant="professional" />
+          <PrimaryButton label={loading ? 'Entrando...' : 'Entrar na triagem'} onPress={handleLogin} variant="professional" disabled={loading} />
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>

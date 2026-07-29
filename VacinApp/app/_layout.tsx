@@ -14,16 +14,22 @@ import { Stack } from 'expo-router';
 // --- Necessário para o funcionamento de gestos (drag, swipe, etc.) ---
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+// --- Sessão de autenticação (paciente/profissional/unidade) ---
+import { AuthProvider } from '../contexts/AuthContext';
+
 // -------------------------------------------------------
 // COMPONENTE PRINCIPAL: Layout Raiz
 // Envolve toda a aplicação no GestureHandlerRootView,
-// necessário para bibliotecas como Reanimated e gestos nativos.
+// necessário para bibliotecas como Reanimated e gestos nativos,
+// e no AuthProvider, que disponibiliza a sessão do usuário
+// (token, perfil) para qualquer tela do app.
 // -------------------------------------------------------
 export default function RootLayout() {
   return (
     // GestureHandlerRootView deve envolver TODA a aplicação
     // para que os gestos (deslizar, arrastar) funcionem corretamente
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
       {/* Stack Navigator: gerencia a pilha de telas e navegação entre elas */}
       <Stack screenOptions={{
         headerShown: false, // Remove o cabeçalho padrão em todas as telas (cada tela tem o seu)
@@ -40,6 +46,7 @@ export default function RootLayout() {
         {/* Grupo de telas institucionais: unidade de saúde e triagem pública */}
         <Stack.Screen name="(unit)" />
       </Stack>
+      </AuthProvider>
     </GestureHandlerRootView>
   );
 }

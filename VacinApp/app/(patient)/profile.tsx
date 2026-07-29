@@ -31,38 +31,38 @@ import { Ionicons } from '@expo/vector-icons';
 // --- Paleta de cores oficial do VacinApp ---
 import { Colors } from '../../constants/Colors';
 
-// --- Dados mockados (simulam retorno de API) ---
-import { mockVaccines } from '../../constants/MockData';
-
-// -------------------------------------------------------
-// DADOS CALCULADOS: Estatísticas do histórico vacinal
-// Em produção, virão do back-end Python
-// -------------------------------------------------------
-const complete = mockVaccines.filter(v => v.status === 'complete').length; // Total tomadas
-const pending  = mockVaccines.filter(v => v.status === 'pending').length;  // Total pendentes
-const overdue  = mockVaccines.filter(v => v.status === 'overdue').length;  // Total atrasadas
-
-// -------------------------------------------------------
-// DADOS DE INFORMAÇÕES PESSOAIS DO USUÁRIO
-// Em produção, virão do perfil autenticado
-// -------------------------------------------------------
-const INFO_ITEMS = [
-  { icon: 'person-outline',   label: 'Nome',       value: 'Ana Clara Souza' },
-  { icon: 'calendar-outline', label: 'Nascimento',  value: '12/03/1996' },
-  { icon: 'card-outline',     label: 'CPF',         value: '123.456.789-00' },
-  { icon: 'mail-outline',     label: 'E-mail',      value: 'ana.clara@email.com' },
-];
+// --- Sessão do paciente autenticado (perfil já carregado no login) ---
+import { useAuth } from '../../contexts/AuthContext';
 
 // -------------------------------------------------------
 // COMPONENTE PRINCIPAL: Perfil do Paciente
 // -------------------------------------------------------
 export default function ProfileScreen() {
+  const { patient, logout } = useAuth();
+
+  const vaccines = patient?.vaccines ?? [];
+  const complete = vaccines.filter(v => v.status === 'complete').length;
+  const pending  = vaccines.filter(v => v.status === 'pending').length;
+  const overdue  = vaccines.filter(v => v.status === 'overdue').length;
+
+  const infoItems = [
+    { icon: 'person-outline',   label: 'Nome',       value: patient?.name ?? '—' },
+    { icon: 'calendar-outline', label: 'Nascimento', value: patient?.birthDate ?? '—' },
+    { icon: 'card-outline',     label: 'CPF',        value: patient?.cpf ?? '—' },
+    { icon: 'mail-outline',     label: 'E-mail',     value: patient?.email ?? '—' },
+  ];
+
   // Exibe confirmação antes de deslogar e redireciona para o login
   const handleLogout = () => {
+    const doLogout = async () => {
+      await logout();
+      router.replace('/(auth)/login');
+    };
+
     if (Platform.OS === 'web') {
       // Alert.alert não funciona corretamente na web — usa confirm nativo do browser
       if (window.confirm('Tem certeza que deseja sair da conta?')) {
-        router.replace('/(auth)/login');
+        doLogout();
       }
     } else {
       Alert.alert(
@@ -73,7 +73,7 @@ export default function ProfileScreen() {
           {
             text: 'Sair',
             style: 'destructive',
-            onPress: () => router.replace('/(auth)/login'),
+            onPress: doLogout,
           },
         ]
       );
@@ -93,8 +93,8 @@ export default function ProfileScreen() {
           <View style={styles.avatar}>
             <Ionicons name="person" size={44} color={Colors.PRIMARY} />
           </View>
-          <Text style={styles.name}>Ana Clara Souza</Text>
-          <Text style={styles.email}>ana.clara@email.com</Text>
+          <Text style={styles.name}>{patient?.name ?? '—'}</Text>
+          <Text style={styles.email}>{patient?.email ?? '—'}</Text>
           {/* Badge de conta verificada */}
           <View style={styles.verifiedBadge}>
             <Ionicons name="checkmark-circle" size={14} color={Colors.NEUTRAL.WHITE} />
@@ -121,8 +121,8 @@ export default function ProfileScreen() {
         <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.section}>
           <Text style={styles.sectionTitle}>Dados Pessoais</Text>
           <View style={styles.card}>
-            {INFO_ITEMS.map((item, i) => (
-              <View key={item.label} style={[styles.infoRow, i < INFO_ITEMS.length - 1 && styles.infoRowBorder]}>
+            {infoItems.map((item, i) => (
+              <View key={item.label} style={[styles.infoRow, i < infoItems.length - 1 && styles.infoRowBorder]}>
                 <Ionicons name={item.icon as any} size={18} color={Colors.SECONDARY} />
                 <View style={styles.infoTexts}>
                   <Text style={styles.infoLabel}>{item.label}</Text>

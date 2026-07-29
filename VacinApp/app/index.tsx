@@ -36,6 +36,9 @@ import Constants from 'expo-constants';
 // --- Paleta de cores oficial do VacinApp ---
 import { Colors } from '../constants/Colors';
 
+// --- Sessão de autenticação salva no dispositivo ---
+import { useAuth } from '../contexts/AuthContext';
+
 // Obtém a largura da tela para uso em estilos responsivos
 const { width } = Dimensions.get('window');
 
@@ -44,6 +47,9 @@ const { width } = Dimensions.get('window');
 // Exibe o logo animado e redireciona após 2,5 segundos
 // -------------------------------------------------------
 export default function SplashScreen() {
+  // Sessão salva no dispositivo (restaurada em segundo plano pelo AuthProvider)
+  const { isReady, sessionType } = useAuth();
+
   // Estado compartilhado para controlar a escala do logo (efeito de zoom)
   const scale   = useSharedValue(0.75);
   // Estado compartilhado para controlar a opacidade (efeito de fade in)
@@ -61,14 +67,25 @@ export default function SplashScreen() {
     // Animação de entrada: logo sobe levemente ao aparecer
     logoY.value   = withSpring(0, { damping: 12 });
 
-    // Redireciona para a tela de login após 2,5 segundos
+    // Redireciona após 2,5 segundos — se já existir uma sessão salva
+    // (paciente, profissional ou unidade), pula o login e vai direto
+    // para a área correspondente.
     const timer = setTimeout(() => {
-      router.replace('/(auth)/login');
+      if (!isReady) return; // AuthProvider ainda restaurando a sessão — tenta de novo abaixo
+      if (sessionType === 'patient') {
+        router.replace('/(patient)/home');
+      } else if (sessionType === 'professional') {
+        router.replace('/(professional)/home');
+      } else if (sessionType === 'unit') {
+        router.replace('/(unit)/triage');
+      } else {
+        router.replace('/(auth)/login');
+      }
     }, 2500);
 
     // Limpa o timer se o componente for desmontado antes do tempo
     return () => clearTimeout(timer);
-  }, []);
+  }, [isReady, sessionType]);
 
   // Estilo animado aplicado ao logo (combina opacidade, escala e posição)
   const logoStyle = useAnimatedStyle(() => ({

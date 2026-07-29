@@ -18,18 +18,18 @@
 // ROTA: /app/(professional)/patient-profile.tsx
 // ============================================================
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
-import { mockPatientProfiles } from '../../constants/MockData';
-import type { Vaccine } from '../../constants/MockData';
+import type { PatientProfile, Vaccine } from '../../constants/MockData';
+import { getPatientProfile } from '../../services/api/patients';
 
 // ── Configuração visual do status de vacina ───────────────
 const STATUS_CONFIG = {
@@ -103,13 +103,26 @@ export default function PatientProfileScreen() {
   const patientId = params.patientId ?? '1';
   const network   = params.network ?? 'public';
 
-  // Busca o perfil pelo ID (futuramente: GET /patients/{patientId}/profile)
-  const patient = mockPatientProfiles.find(p => p.id === patientId)
-    ?? mockPatientProfiles[0];
+  const [patient, setPatient] = useState<PatientProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Busca o perfil pelo ID sempre que a tela ganha foco (ex.: voltar após registrar vacina)
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setLoading(true);
+      getPatientProfile(patientId)
+        .then(p => { if (active) setPatient(p); })
+        .catch(() => { if (active) setPatient(null); })
+        .finally(() => { if (active) setLoading(false); });
+      return () => { active = false; };
+    }, [patientId])
+  );
 
   // ── Handlers de ação ────────────────────────────────────
 
   const handleRegisterVaccine = () => {
+    if (!patient) return;
     router.push({
       pathname: '/(professional)/register-vaccine',
       params: { patientId: patient.id, network },
@@ -117,9 +130,31 @@ export default function PatientProfileScreen() {
   };
 
   // ── Dados derivados ──────────────────────────────────────
-  const doneVaccines    = patient.vaccines.filter(v => v.status === 'complete');
-  const pendingVaccines = patient.vaccines.filter(v => v.status === 'pending');
-  const overdueVaccines = patient.vaccines.filter(v => v.status === 'overdue');
+  const doneVaccines    = patient?.vaccines.filter(v => v.status === 'complete') ?? [];
+  const pendingVaccines = patient?.vaccines.filter(v => v.status === 'pending') ?? [];
+  const overdueVaccines = patient?.vaccines.filter(v => v.status === 'overdue') ?? [];
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safe, { alignItems: 'center', justifyContent: 'center' }]} edges={['top']}>
+        <ActivityIndicator size="large" color={Colors.PROFESSIONAL} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!patient) {
+    return (
+      <SafeAreaView style={[styles.safe, { alignItems: 'center', justifyContent: 'center', padding: 24 }]} edges={['top']}>
+        <Ionicons name="alert-circle-outline" size={40} color={Colors.NEUTRAL.MUTED} />
+        <Text style={{ marginTop: 10, color: Colors.NEUTRAL.MUTED, textAlign: 'center' }}>
+          Não foi possível carregar este paciente.
+        </Text>
+        <TouchableOpacity style={{ marginTop: 16 }} onPress={() => router.back()}>
+          <Text style={{ color: Colors.PROFESSIONAL, fontWeight: '700' }}>Voltar</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

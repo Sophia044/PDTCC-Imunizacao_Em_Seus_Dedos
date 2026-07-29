@@ -20,6 +20,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
 import { InputField } from '../../components/InputField';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { useAuth } from '../../contexts/AuthContext';
+import { ApiError } from '../../services/api/client';
 
 // -------------------------------------------------------
 // Dados mockados: lista de convênios disponíveis
@@ -166,6 +168,9 @@ export default function RegisterPrivateScreen() {
   const [email, setEmail]         = useState('');
   const [password, setPassword]   = useState('');
   const [confirm, setConfirm]     = useState('');
+  const [loading, setLoading]     = useState(false);
+
+  const { registerPatientPrivate } = useAuth();
 
   // ---- Máscaras de formatação ----
 
@@ -196,7 +201,7 @@ export default function RegisterPrivateScreen() {
   };
 
   // ---- Validação e envio ----
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim()) {
       Alert.alert('Campo obrigatório', 'Informe o nome completo.');
       return;
@@ -213,6 +218,10 @@ export default function RegisterPrivateScreen() {
       Alert.alert('Carteirinha obrigatória', 'Informe o número da carteirinha do plano.');
       return;
     }
+    if (!email.includes('@')) {
+      Alert.alert('E-mail inválido', 'Informe um e-mail válido.');
+      return;
+    }
     if (password.length < 8) {
       Alert.alert('Senha fraca', 'A senha deve ter no mínimo 8 caracteres.');
       return;
@@ -222,9 +231,16 @@ export default function RegisterPrivateScreen() {
       return;
     }
 
-    // TODO: Integrar com API do convênio selecionado
-    console.log('Cadastro Convênio (mock):', { name, cpf, birthdate, convenio, carteirinha, phone, email });
-    router.replace('/(patient)/home');
+    setLoading(true);
+    try {
+      await registerPatientPrivate({ name, cpf, birthdate, convenio, carteirinha, phone, email, password });
+      router.replace('/(patient)/home');
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Não foi possível criar sua conta. Tente novamente.';
+      Alert.alert('Erro ao cadastrar', message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -384,7 +400,7 @@ export default function RegisterPrivateScreen() {
 
         {/* ---- BOTÃO CRIAR CONTA ---- */}
         <Animated.View entering={FadeInDown.delay(460).duration(600)}>
-          <PrimaryButton label="Criar Conta" onPress={handleSubmit} />
+          <PrimaryButton label={loading ? 'Criando conta...' : 'Criar Conta'} onPress={handleSubmit} disabled={loading} />
         </Animated.View>
 
         {/* ---- LINK: JÁ TENHO CONTA ---- */}

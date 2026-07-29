@@ -67,6 +67,9 @@ export interface PatientProfile extends Patient {
   vaccines: Vaccine[];     // Histórico vacinal completo
   pendingVaccines: string[];  // Nomes das vacinas pendentes
   overdueVaccines: string[]; // Nomes das vacinas atrasadas
+  email?: string;            // E-mail de acesso à conta
+  birthDate?: string;        // Data de nascimento (DD/MM/YYYY)
+  phone?: string;           // Telefone de contato — opcional
 }
 
 // -------------------------------------------------------
@@ -132,7 +135,7 @@ export interface HealthUnit {
   id: string;             // Identificador único do estabelecimento
   name: string;           // Nome do posto (ex: "UBS Central")
   address: string;        // Endereço completo
-  distance: string;       // Distância aproximada do usuário (ex: "1,2 km")
+  distance?: string;      // Distância aproximada do usuário (ex: "1,2 km") — requer GPS
   type: HealthUnitType;   // 'SUS' ou 'Particular'
   hours: string;          // Horário de funcionamento (ex: "Seg-Sex 07h-17h")
   phone: string;          // Telefone de contato

@@ -11,6 +11,8 @@ USE vacinapp;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS stock_items;
+DROP TABLE IF EXISTS campaigns;
 DROP TABLE IF EXISTS public_queue;
 DROP TABLE IF EXISTS appointments;
 DROP TABLE IF EXISTS vaccination_records;
@@ -274,5 +276,49 @@ CREATE TABLE public_queue (
     ON DELETE CASCADE,
   CONSTRAINT fk_public_queue_health_unit
     FOREIGN KEY (health_unit_id) REFERENCES health_units (id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- Campanhas vacinais ativas de uma unidade.
+-- Acrescentada durante a integracao com o backend: a tela da
+-- home do profissional ja previa este dado (card de campanha).
+-- ------------------------------------------------------------
+CREATE TABLE campaigns (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  health_unit_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(180) NOT NULL,
+  target VARCHAR(180) NOT NULL,
+  deadline DATE NOT NULL,
+  applied INT NOT NULL DEFAULT 0,
+  goal INT NOT NULL DEFAULT 0,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_campaigns_health_unit (health_unit_id),
+  CONSTRAINT fk_campaigns_health_unit
+    FOREIGN KEY (health_unit_id) REFERENCES health_units (id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- Estoque de vacinas de uma unidade.
+-- Acrescentada durante a integracao com o backend: usada no
+-- alerta de estoque baixo na home do profissional.
+-- ------------------------------------------------------------
+CREATE TABLE stock_items (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  health_unit_id BIGINT UNSIGNED NOT NULL,
+  vaccine_id BIGINT UNSIGNED NOT NULL,
+  quantity INT NOT NULL DEFAULT 0,
+  min_level INT NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_stock_unit_vaccine (health_unit_id, vaccine_id),
+  CONSTRAINT fk_stock_items_health_unit
+    FOREIGN KEY (health_unit_id) REFERENCES health_units (id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_stock_items_vaccine
+    FOREIGN KEY (vaccine_id) REFERENCES vaccines (id)
     ON DELETE CASCADE
 ) ENGINE=InnoDB;

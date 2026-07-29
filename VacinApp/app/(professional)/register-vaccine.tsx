@@ -47,13 +47,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
 import { InputField } from '../../components/InputField';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { availableVaccines, availableManufacturers, mockPatientProfiles } from '../../constants/MockData';
+import { availableManufacturers } from '../../constants/MockData';
+import type { PatientProfile } from '../../constants/MockData';
 import { PatientContextCard, SuccessModal } from '../../components/professional';
 import {
   getPublicVaccinationQueue,
   removePublicQueuePatient,
+  findPatientBySus,
 } from '../../services/PublicQueueStore';
 import type { PublicQueuePatient } from '../../services/PublicQueueStore';
+import { getPatientProfile } from '../../services/api/patients';
+import { listVaccineNames } from '../../services/api/vaccines';
+import { registerVaccination } from '../../services/api/vaccinations';
+import { ApiError } from '../../services/api/client';
 
 // -------------------------------------------------------
 // Sub-componente: Seletor tipo dropdown
@@ -124,14 +130,25 @@ export default function RegisterVaccineScreen() {
   const [activeQueueId, setActiveQueueId] = useState<string | undefined>(
     initialQueueId ? String(initialQueueId) : undefined
   );
-  const [publicQueue, setPublicQueue] = useState<PublicQueuePatient[]>(getPublicVaccinationQueue());
+  const [publicQueue, setPublicQueue] = useState<PublicQueuePatient[]>([]);
   const [susSearch, setSusSearch] = useState('');
   const [susSearchError, setSusSearchError] = useState('');
+  const [susSearchLoading, setSusSearchLoading] = useState(false);
+
+  // Catálogo de vacinas — carregado uma vez do backend
+  const [vaccineOptions, setVaccineOptions] = useState<string[]>([]);
+  useEffect(() => {
+    listVaccineNames().then(setVaccineOptions).catch(() => {});
+  }, []);
+
+  const reloadQueue = useCallback(() => {
+    getPublicVaccinationQueue().then(setPublicQueue).catch(() => {});
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      setPublicQueue(getPublicVaccinationQueue());
-    }, [])
+      if (network === 'public') reloadQueue();
+    }, [network, reloadQueue])
   );
 
   useEffect(() => {
@@ -143,11 +160,17 @@ export default function RegisterVaccineScreen() {
     }
   }, [initialPatientId, initialQueueId]);
 
-  // Busca o perfil do paciente pelo ID
-  // Futuramente: GET /patients/{patientId}/profile
-  const patient = selectedPatientId
-    ? mockPatientProfiles.find(p => p.id === selectedPatientId)
-    : undefined;
+  // Busca o perfil completo do paciente selecionado (sempre atualizado)
+  const [patient, setPatient] = useState<PatientProfile | undefined>(undefined);
+  useEffect(() => {
+    if (!selectedPatientId) {
+      setPatient(undefined);
+      return;
+    }
+    let active = true;
+    getPatientProfile(selectedPatientId).then(p => { if (active) setPatient(p); }).catch(() => { if (active) setPatient(undefined); });
+    return () => { active = false; };
+  }, [selectedPatientId]);
 
   // ── Estados do formulário (nomes alinhados ao payload da API) ──
   const [vaccine,      setVaccine]      = useState('');
@@ -162,6 +185,7 @@ export default function RegisterVaccineScreen() {
   const [showVaccine,      setShowVaccine]      = useState(false);
   const [showManufacturer, setShowManufacturer] = useState(false);
   const [showSuccess,      setShowSuccess]      = useState(false);
+  const [submitting,       setSubmitting]       = useState(false);
 
   // ── Máscara de data ──────────────────────────────────────
   const handleDate = (t: string) => {
@@ -185,7 +209,7 @@ export default function RegisterVaccineScreen() {
     if (susSearchError) setSusSearchError('');
   };
 
-  const handleFindPatientBySus = () => {
+  const handleFindPatientBySus = async () => {
     const query = susSearch.replace(/\D/g, '');
 
     if (query.length < 15) {
@@ -193,15 +217,20 @@ export default function RegisterVaccineScreen() {
       return;
     }
 
-    const foundPatient = mockPatientProfiles.find(p => p.sus.replace(/\D/g, '') === query);
-
-    if (!foundPatient) {
-      setSusSearchError('Nenhum paciente encontrado com esse número do SUS.');
-      return;
+    setSusSearchLoading(true);
+    try {
+      const foundPatient = await findPatientBySus(query);
+      if (!foundPatient) {
+        setSusSearchError('Nenhum paciente encontrado com esse número do SUS.');
+        return;
+      }
+      setSelectedPatientId(foundPatient.id);
+      setSusSearchError('');
+    } catch (error) {
+      setSusSearchError(error instanceof ApiError ? error.message : 'Não foi possível buscar o paciente.');
+    } finally {
+      setSusSearchLoading(false);
     }
-
-    setSelectedPatientId(foundPatient.id);
-    setSusSearchError('');
   };
 
   const handleStartQueuedPatient = (item: PublicQueuePatient) => {
@@ -214,7 +243,7 @@ export default function RegisterVaccineScreen() {
   const handleBackToQueue = () => {
     setSelectedPatientId(undefined);
     setActiveQueueId(undefined);
-    setPublicQueue(getPublicVaccinationQueue());
+    reloadQueue();
   };
 
   const resetForm = () => {
@@ -230,7 +259,7 @@ export default function RegisterVaccineScreen() {
   };
 
   // ── Validação e envio ────────────────────────────────────
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!patient) {
       Alert.alert('Paciente não identificado', 'Busque o paciente pelo número do SUS antes de registrar a vacinação.');
       return;
@@ -241,31 +270,38 @@ export default function RegisterVaccineScreen() {
       return;
     }
 
-    // Payload preparado para a API
-    // TODO: await api.post('/vaccinations', payload);
-    const payload = {
-      patientId: patient.id,
-      vaccine,
-      dose,
-      manufacturer,
-      lot,
-      date,
-      location,
-      notes,
-      networkType: network,
-    };
-    console.log('Registrar Vacinação (payload pronto para API):', payload);
-
-    // Exibe o modal de sucesso
-    setShowSuccess(true);
+    setSubmitting(true);
+    try {
+      await registerVaccination({
+        patientId: patient.id,
+        vaccine,
+        dose,
+        manufacturer,
+        lot,
+        date,
+        location,
+        notes,
+        networkType: network,
+      });
+      setShowSuccess(true);
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Não foi possível registrar a vacinação. Tente novamente.';
+      Alert.alert('Erro ao registrar', message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // ── Ao fechar o modal, volta para o perfil do paciente ──
-  const handleSuccessDismiss = () => {
+  const handleSuccessDismiss = async () => {
     setShowSuccess(false);
     if (activeQueueId) {
-      removePublicQueuePatient(activeQueueId);
-      setPublicQueue(getPublicVaccinationQueue());
+      try {
+        await removePublicQueuePatient(activeQueueId);
+      } catch {
+        // Se a remoção falhar, a recepção ainda pode removê-lo manualmente depois.
+      }
+      reloadQueue();
     }
 
     if (!initialPatientId && network === 'public') {
@@ -367,9 +403,10 @@ export default function RegisterVaccineScreen() {
               />
               {susSearchError ? <Text style={styles.searchError}>{susSearchError}</Text> : null}
               <PrimaryButton
-                label="Buscar Paciente"
+                label={susSearchLoading ? 'Buscando...' : 'Buscar Paciente'}
                 onPress={handleFindPatientBySus}
                 variant="professional"
+                disabled={susSearchLoading}
               />
             </Animated.View>
           )}
@@ -395,7 +432,7 @@ export default function RegisterVaccineScreen() {
             <DropdownSelector
               label="Vacina"
               value={vaccine}
-              options={availableVaccines}
+              options={vaccineOptions}
               isOpen={showVaccine}
               onToggle={() => { setShowVaccine(v => !v); setShowManufacturer(false); }}
               onSelect={v => { setVaccine(v); setShowVaccine(false); }}
@@ -467,9 +504,10 @@ export default function RegisterVaccineScreen() {
           {/* ── BOTÃO PRINCIPAL ──────────────────────────── */}
           <Animated.View entering={FadeInDown.delay(330).duration(400)}>
             <PrimaryButton
-              label="Registrar Vacinação"
+              label={submitting ? 'Registrando...' : 'Registrar Vacinação'}
               onPress={handleSubmit}
               variant="professional"
+              disabled={submitting}
             />
           </Animated.View>
             </>

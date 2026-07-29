@@ -9,7 +9,7 @@
 // ============================================================
 
 // --- Bibliotecas principais do React ---
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 // --- Componentes de layout e interação do React Native ---
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -35,8 +35,11 @@ import { Colors } from '../../constants/Colors';
 // --- Componente interno: Badge de status da vacina ---
 import { StatusBadge } from '../../components/StatusBadge';
 
-// --- Dados mockados e tipos ---
-import { mockCalendarMarks, mockVaccines, VaccineStatus } from '../../constants/MockData';
+// --- Dados e tipos ---
+import { VaccineStatus } from '../../constants/MockData';
+
+// --- Sessão do paciente autenticado (histórico já carregado no login) ---
+import { useAuth } from '../../contexts/AuthContext';
 
 // -------------------------------------------------------
 // Tipo para o filtro de status das vacinas
@@ -62,22 +65,42 @@ const TODAY = new Date().toISOString().split('T')[0];
 // COMPONENTE PRINCIPAL: Calendário Vacinal
 // -------------------------------------------------------
 export default function CalendarScreen() {
+  const { patient } = useAuth();
+  const vaccines = patient?.vaccines ?? [];
+
   // Data selecionada pelo usuário no calendário (null = nenhuma data selecionada)
   const [selected, setSelected] = useState<string | null>(null);
   // Filtro de status ativo nos chips abaixo do calendário
   const [filter, setFilter]     = useState<Filter>('all');
 
   // Filtra as vacinas de acordo com o chip de status ativo
-  const filtered = mockVaccines.filter(v => filter === 'all' || v.status === filter);
+  const filtered = vaccines.filter(v => filter === 'all' || v.status === filter);
+
+  // Cor do ponto no calendário para cada status de vacina
+  const DOT_COLOR: Record<VaccineStatus, string> = {
+    complete: Colors.STATUS.COMPLETE,
+    pending:  Colors.STATUS.PENDING,
+    overdue:  Colors.STATUS.OVERDUE,
+  };
+
+  // Marcações do calendário calculadas a partir do histórico real do paciente
+  const calendarMarks = useMemo(() => {
+    const marks: Record<string, any> = {};
+    vaccines.forEach(v => {
+      const existing = marks[v.date]?.dots ?? [];
+      marks[v.date] = { dots: [...existing, { key: v.id, color: DOT_COLOR[v.status] }] };
+    });
+    return marks;
+  }, [vaccines]);
 
   // Mescla as marcações do calendário com a data selecionada (destaque em roxo)
   const markedWithSelected = selected
-    ? { ...mockCalendarMarks, [selected]: { ...(mockCalendarMarks[selected] ?? {}), selected: true, selectedColor: Colors.PRIMARY } }
-    : mockCalendarMarks;
+    ? { ...calendarMarks, [selected]: { ...(calendarMarks[selected] ?? {}), selected: true, selectedColor: Colors.PRIMARY } }
+    : calendarMarks;
 
   // Vacinas que ocorreram na data selecionada (para exibir no painel do dia)
   const selectedVaccines = selected
-    ? mockVaccines.filter(v => v.date.startsWith(selected))
+    ? vaccines.filter(v => v.date.startsWith(selected))
     : [];
 
   return (

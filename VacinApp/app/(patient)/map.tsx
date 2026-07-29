@@ -8,10 +8,11 @@
 // ============================================================
 
 // --- Bibliotecas principais do React ---
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 // --- Componentes de layout e interação do React Native ---
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,7 +21,6 @@ import {
   View,
   Linking,
   Alert,
-  Platform,
 } from 'react-native';
 
 // --- Animações com Reanimated ---
@@ -28,6 +28,9 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 // --- Área segura (evita sobreposição com status bar e notch) ---
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// --- Navegação (recarrega ao voltar para a tela) ---
+import { useFocusEffect } from 'expo-router';
 
 // --- Controle da barra de status do sistema operacional ---
 import { StatusBar } from 'expo-status-bar';
@@ -41,84 +44,9 @@ import * as Location from 'expo-location';
 // --- Paleta de cores oficial do VacinApp ---
 import { Colors } from '../../constants/Colors';
 
-// -------------------------------------------------------
-// DADOS DE EXEMPLO (mock)
-// Esses dados simulam o retorno de uma API real com os
-// postos de saúde próximos ao usuário.
-// Em produção, serão substituídos por chamadas ao back-end Python.
-// -------------------------------------------------------
-const healthUnits = [
-  {
-    id: 1,
-    name: 'UBS Central',
-    type: 'SUS',
-    address: 'Rua das Flores, 123 - Centro',
-    lat: -23.5489,
-    lng: -46.6388,
-    distance: '0,8 km',
-    hours: 'Seg-Sex: 7h-17h',
-    phone: '(11) 3333-1111',
-  },
-  {
-    id: 2,
-    name: 'UBS Vila Nova',
-    type: 'SUS',
-    address: 'Av. Paulista, 456 - Vila Nova',
-    lat: -23.5550,
-    lng: -46.6420,
-    distance: '1,2 km',
-    hours: 'Seg-Sex: 7h-19h | Sáb: 8h-12h',
-    phone: '(11) 3333-2222',
-  },
-  {
-    id: 3,
-    name: 'Clínica Vida Saúde',
-    type: 'Particular',
-    address: 'R. das Acácias, 789 - Vila Nova',
-    lat: -23.5460,
-    lng: -46.6310,
-    distance: '2,1 km',
-    hours: 'Seg-Sáb: 08h-20h',
-    phone: '(11) 3333-3333',
-  },
-  {
-    id: 4,
-    name: 'UBS Jardim América',
-    type: 'SUS',
-    address: 'Av. Brasil, 456 - Jd. América',
-    lat: -23.5530,
-    lng: -46.6290,
-    distance: '2,8 km',
-    hours: 'Seg-Sex: 07h-19h',
-    phone: '(11) 3333-4444',
-  },
-  {
-    id: 5,
-    name: 'UBS Vila Esperança',
-    type: 'SUS',
-    address: 'R. da Paz, 321 - Vila Esperança',
-    lat: -23.5570,
-    lng: -46.6350,
-    distance: '3,0 km',
-    hours: 'Seg-Sex: 07h-17h',
-    phone: '(11) 3333-5555',
-  },
-];
-
-// -------------------------------------------------------
-// Define a interface de um posto de saúde
-// -------------------------------------------------------
-interface HealthUnit {
-  id: number;
-  name: string;          // Nome do estabelecimento
-  type: string;          // 'SUS' ou 'Particular'
-  address: string;       // Endereço completo
-  lat: number;           // Latitude para o mapa
-  lng: number;           // Longitude para o mapa
-  distance: string;      // Distância aproximada do usuário
-  hours: string;         // Horário de funcionamento
-  phone: string;         // Telefone de contato
-}
+// --- Tipos e API real ---
+import type { HealthUnit } from '../../constants/MockData';
+import { listHealthUnits } from '../../services/api/healthUnits';
 
 // -------------------------------------------------------
 // Componente interno: Card de um posto de saúde na lista
@@ -147,8 +75,8 @@ function UnitCard({ unit, index }: { unit: HealthUnit; index: number }) {
         <View style={[styles.badge, { backgroundColor: badgeColor }]}>
           <Text style={styles.badgeText}>{unit.type}</Text>
         </View>
-        {/* Distância exibida no canto superior direito */}
-        <Text style={styles.distanceText}>{unit.distance}</Text>
+        {/* Distância exibida no canto superior direito (quando disponível) */}
+        {unit.distance ? <Text style={styles.distanceText}>{unit.distance}</Text> : null}
       </View>
 
       {/* ---- NOME DO POSTO ---- */}
@@ -183,13 +111,24 @@ export default function MapScreen() {
   // Estado que armazena o texto digitado na barra de busca
   const [query, setQuery] = useState('');
 
-  // Estado para coordenadas da localização do usuário (inicia no centro de SP)
-  const [region] = useState({
-    latitude: -23.5489,
-    longitude: -46.6388,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  });
+  // Postos de saúde reais, vindos do backend
+  const [healthUnits, setHealthUnits] = useState<HealthUnit[]>([]);
+  const [loading, setLoading]         = useState(true);
+
+  // Carrega os postos de saúde — usa a localização do usuário quando disponível
+  // para o backend já devolver a distância calculada e a lista ordenada.
+  const loadUnits = useCallback(async (coords?: { latitude: number; longitude: number }) => {
+    setLoading(true);
+    try {
+      setHealthUnits(await listHealthUnits(coords));
+    } catch {
+      setHealthUnits([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { loadUnits(); }, [loadUnits]));
 
   // Filtra os postos com base no texto digitado pelo usuário
   const filtered = healthUnits.filter(
@@ -206,13 +145,16 @@ export default function MapScreen() {
   }, []);
 
   // Função chamada ao pressionar o botão de GPS
-  // Em web, a API de location não está disponível, portanto exibe alerta
+  // Busca a posição atual e recarrega os postos com distância real calculada
   const handleGPS = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permissão negada', 'Autorize o acesso à localização nas configurações.');
+        return;
       }
+      const position = await Location.getCurrentPositionAsync({});
+      await loadUnits({ latitude: position.coords.latitude, longitude: position.coords.longitude });
     } catch {
       Alert.alert('GPS', 'Localização não disponível nesta plataforma.');
     }
@@ -317,10 +259,11 @@ export default function MapScreen() {
       </Animated.View>
 
       {/* ---- TÍTULO DA LISTA DE POSTOS ---- */}
-      <Animated.View entering={FadeInDown.delay(280).duration(400)} style={styles.listHeader}>
+      <Animated.View entering={FadeInDown.delay(280).duration(400)} style={[styles.listHeader, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
         <Text style={styles.listHeaderText}>
           {filtered.length} posto{filtered.length !== 1 ? 's' : ''} próximo{filtered.length !== 1 ? 's' : ''} ↓
         </Text>
+        {loading && <ActivityIndicator size="small" color={Colors.PRIMARY} />}
       </Animated.View>
 
       {/* ---- LISTA DE CARDS DOS POSTOS ---- */}

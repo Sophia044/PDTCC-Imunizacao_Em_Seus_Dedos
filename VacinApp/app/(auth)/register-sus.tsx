@@ -20,6 +20,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
 import { InputField } from '../../components/InputField';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { useAuth } from '../../contexts/AuthContext';
+import { ApiError } from '../../services/api/client';
 
 // -------------------------------------------------------
 // Componente interno: Indicador de etapas
@@ -71,6 +73,9 @@ export default function RegisterSusScreen() {
   const [email, setEmail]         = useState('');
   const [password, setPassword]   = useState('');
   const [confirm, setConfirm]     = useState('');
+  const [loading, setLoading]     = useState(false);
+
+  const { registerPatientSus } = useAuth();
 
   // ---- Máscaras de formatação ----
 
@@ -111,7 +116,7 @@ export default function RegisterSusScreen() {
   };
 
   // ---- Validação e envio ----
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim()) {
       Alert.alert('Campo obrigatório', 'Informe o nome completo.');
       return;
@@ -124,6 +129,10 @@ export default function RegisterSusScreen() {
       Alert.alert('CNS obrigatório', 'Informe o número completo do Cartão Nacional de Saúde.');
       return;
     }
+    if (!email.includes('@')) {
+      Alert.alert('E-mail inválido', 'Informe um e-mail válido.');
+      return;
+    }
     if (password.length < 8) {
       Alert.alert('Senha fraca', 'A senha deve ter no mínimo 8 caracteres.');
       return;
@@ -133,9 +142,16 @@ export default function RegisterSusScreen() {
       return;
     }
 
-    // TODO: Integrar com API do SUS / banco de dados
-    console.log('Cadastro SUS (mock):', { name, cpf, birthdate, cns, phone, email });
-    router.replace('/(patient)/home');
+    setLoading(true);
+    try {
+      await registerPatientSus({ name, cpf, birthdate, cns, phone, email, password });
+      router.replace('/(patient)/home');
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Não foi possível criar sua conta. Tente novamente.';
+      Alert.alert('Erro ao cadastrar', message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -293,7 +309,7 @@ export default function RegisterSusScreen() {
 
         {/* ---- BOTÃO CRIAR CONTA ---- */}
         <Animated.View entering={FadeInDown.delay(460).duration(600)}>
-          <PrimaryButton label="Criar Conta" onPress={handleSubmit} />
+          <PrimaryButton label={loading ? 'Criando conta...' : 'Criar Conta'} onPress={handleSubmit} disabled={loading} />
         </Animated.View>
 
         {/* ---- LINK: JÁ TENHO CONTA ---- */}

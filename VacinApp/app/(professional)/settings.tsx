@@ -40,6 +40,9 @@ import { router } from 'expo-router';
 // --- Paleta de cores oficial do VacinApp ---
 import { Colors } from '../../constants/Colors';
 
+// --- Sessão do profissional autenticado ---
+import { useAuth } from '../../contexts/AuthContext';
+
 // -------------------------------------------------------
 // Tipo para os ícones do Ionicons (garante tipagem correta)
 // -------------------------------------------------------
@@ -90,6 +93,8 @@ function SettingItem({ icon, label, onPress, showArrow = true, rightText }: Sett
 // COMPONENTE PRINCIPAL da tela de Configurações
 // -------------------------------------------------------
 export default function ProfessionalSettingsScreen() {
+  const { professional, logout } = useAuth();
+
   // -------------------------------------------------------
   // ESTADOS DOS TOGGLES DE NOTIFICAÇÃO
   // -------------------------------------------------------
@@ -99,10 +104,15 @@ export default function ProfessionalSettingsScreen() {
 
   // Exibe confirmação antes de deslogar e redireciona para o login
   const handleLogout = () => {
+    const doLogout = async () => {
+      await logout();
+      router.replace('/(auth)/login');
+    };
+
     if (Platform.OS === 'web') {
       // Alert.alert não funciona corretamente na web — usa confirm nativo do browser
       if (window.confirm('Tem certeza que deseja sair da conta?')) {
-        router.replace('/(auth)/login');
+        doLogout();
       }
     } else {
       Alert.alert(
@@ -113,7 +123,7 @@ export default function ProfessionalSettingsScreen() {
           {
             text: 'Sair',
             style: 'destructive',
-            onPress: () => router.replace('/(auth)/login'),
+            onPress: doLogout,
           },
         ]
       );
@@ -143,8 +153,8 @@ export default function ProfessionalSettingsScreen() {
 
           {/* Dados do profissional */}
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Dr(a). Marcos Silva</Text>
-            <Text style={styles.profileSpec}>Médico/a Clínico Geral</Text>
+            <Text style={styles.profileName}>{professional?.name ?? '—'}</Text>
+            <Text style={styles.profileSpec}>{professional?.role ?? '—'}</Text>
             {/* Badge de verificação */}
             <View style={styles.verifiedBadge}>
               <Ionicons name="shield-checkmark" size={12} color="#fff" />

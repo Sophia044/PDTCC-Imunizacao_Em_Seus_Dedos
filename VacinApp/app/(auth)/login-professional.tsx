@@ -44,6 +44,7 @@ import React, { useState } from 'react';
 
 // --- Componentes de layout e interação do React Native ---
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -71,6 +72,10 @@ import { Colors } from '../../constants/Colors';
 // --- Componentes internos do projeto ---
 import { InputField } from '../../components/InputField';
 import { PrimaryButton } from '../../components/PrimaryButton';
+
+// --- Sessão de autenticação e tratamento de erros da API ---
+import { useAuth } from '../../contexts/AuthContext';
+import { ApiError } from '../../services/api/client';
 
 // --- Componentes reutilizáveis de autenticação ---
 import { AuthSegmentSelector, AuthContextMessage } from '../../components/auth';
@@ -150,6 +155,11 @@ export default function LoginProfessionalScreen() {
    */
   const [institution, setInstitution] = useState('');
 
+  /** Estado de carregamento durante a chamada à API */
+  const [loading, setLoading] = useState(false);
+
+  const { loginProfessional } = useAuth();
+
   // ── Flags derivadas do estado ──────────────────────────────
   const isPublic  = networkType === 'public';
   const isPrivate = networkType === 'private';
@@ -162,24 +172,31 @@ export default function LoginProfessionalScreen() {
   };
 
   // ── Handler: login ─────────────────────────────────────────
-  const handleLogin = () => {
-    // Monta o payload exatamente como será enviado à API
-    const payload: ProfessionalLoginPayload = {
-      email,
-      password,
-      professionalRegistry,
-      networkType,
-      ...(isPrivate && institution ? { institution } : {}),
-    };
+  const handleLogin = async () => {
+    if (!email || !password || !professionalRegistry) {
+      Alert.alert('Preencha os campos', 'Informe e-mail, registro profissional e senha.');
+      return;
+    }
 
-    // TODO: Integrar com endpoint de autenticação do profissional
-    // Exemplo: await api.post('/auth/professional/login', payload);
-    console.log('Login Profissional (payload pronto para API):', payload);
-
-    router.replace({
-      pathname: '/(professional)/home',
-      params: { network: networkType },
-    });
+    setLoading(true);
+    try {
+      await loginProfessional({
+        email,
+        password,
+        professionalRegistry,
+        networkType,
+        ...(isPrivate && institution ? { institution } : {}),
+      });
+      router.replace({
+        pathname: '/(professional)/home',
+        params: { network: networkType },
+      });
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Não foi possível entrar. Tente novamente.';
+      Alert.alert('Erro ao entrar', message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -330,9 +347,10 @@ export default function LoginProfessionalScreen() {
         {/* ---- BOTÃO ENTRAR ---- */}
         <Animated.View entering={FadeInDown.delay(460).duration(600)}>
           <PrimaryButton
-            label="Entrar como Profissional"
+            label={loading ? 'Entrando...' : 'Entrar como Profissional'}
             onPress={handleLogin}
             variant="professional"
+            disabled={loading}
           />
         </Animated.View>
 

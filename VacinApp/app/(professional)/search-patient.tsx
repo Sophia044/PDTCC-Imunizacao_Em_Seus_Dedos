@@ -22,9 +22,9 @@
 // ROTA: /app/(professional)/search-patient.tsx
 // ============================================================
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ScrollView, StyleSheet, Text, TextInput,
+  ActivityIndicator, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -33,8 +33,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
-import { mockPatientProfiles } from '../../constants/MockData';
-import type { PatientSearchFilter } from '../../constants/MockData';
+import type { PatientProfile, PatientSearchFilter } from '../../constants/MockData';
+import { searchPatients } from '../../services/api/patients';
 import { PatientCard } from '../../components/professional';
 
 // -------------------------------------------------------
@@ -56,20 +56,20 @@ export default function SearchPatientScreen() {
 
   const [query,  setQuery]  = useState('');
   const [filter, setFilter] = useState<PatientSearchFilter>('name');
+  const [results, setResults] = useState<PatientProfile[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // ── Filtragem local (substituir por chamada de API futuramente) ──
-  const results = query.trim().length === 0
-    ? mockPatientProfiles
-    : mockPatientProfiles.filter(p => {
-        const q = query.toLowerCase();
-        switch (filter) {
-          case 'name': return p.name.toLowerCase().includes(q);
-          case 'cpf':  return p.cpf.replace(/\D/g, '').includes(q.replace(/\D/g, ''));
-          case 'sus':  return p.sus.replace(/\D/g, '').includes(q.replace(/\D/g, ''));
-          case 'plan': return p.plan.toLowerCase().includes(q);
-          default:     return false;
-        }
-      });
+  // ── Busca real via API, com pequeno atraso (debounce) ────
+  useEffect(() => {
+    setLoading(true);
+    const timer = setTimeout(() => {
+      searchPatients(query, filter)
+        .then(setResults)
+        .catch(() => setResults([]))
+        .finally(() => setLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, filter]);
 
   // ── Navegar para perfil do paciente com ID ───────────────
   const goToProfile = (patientId: string) => {
@@ -147,10 +147,11 @@ export default function SearchPatientScreen() {
       </Animated.View>
 
       {/* ── CONTADOR DE RESULTADOS ───────────────────────── */}
-      <Animated.View entering={FadeInDown.delay(180).duration(400)} style={styles.resultsHeader}>
+      <Animated.View entering={FadeInDown.delay(180).duration(400)} style={[styles.resultsHeader, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
         <Text style={styles.resultsCount}>
           {results.length} paciente{results.length !== 1 ? 's' : ''} encontrado{results.length !== 1 ? 's' : ''}
         </Text>
+        {loading && <ActivityIndicator size="small" color={Colors.PROFESSIONAL} />}
       </Animated.View>
 
       {/* ── LISTA DE RESULTADOS ───────────────────────────── */}

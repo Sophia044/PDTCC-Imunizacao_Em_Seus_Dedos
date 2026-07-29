@@ -29,19 +29,21 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
 
-// ── Dados mock ────────────────────────────────────────────
-import {
-  mockProfessionalPublic,
-  mockProfessionalPrivate,
-  mockAppointments,
-  mockCampaigns,
-  mockStock,
-} from '../../constants/MockData';
+// ── Tipos ─────────────────────────────────────────────────
+import type { AppointmentItem, Campaign, StockItem } from '../../constants/MockData';
+
+// ── Sessão do profissional autenticado ───────────────────
+import { useAuth } from '../../contexts/AuthContext';
+
+// ── API real ──────────────────────────────────────────────
+import { listAppointments } from '../../services/api/appointments';
+import { listCampaigns } from '../../services/api/campaigns';
+import { listStock } from '../../services/api/stock';
 import { getPublicVaccinationQueue } from '../../services/PublicQueueStore';
 import type { PublicQueuePatient } from '../../services/PublicQueueStore';
 
@@ -54,33 +56,35 @@ import {
 } from '../../components/professional';
 
 // -------------------------------------------------------
-// HELPERS
-// -------------------------------------------------------
-/** Calcula o número de itens com estoque abaixo do mínimo */
-const lowStockCount = mockStock.filter(s => s.quantity < s.minLevel).length;
-/** Campanha ativa (primeiro mock) */
-const activeCampaign = mockCampaigns[0];
-
-// -------------------------------------------------------
 // COMPONENTE PRINCIPAL
 // -------------------------------------------------------
 export default function ProfessionalHome() {
-  // Lê o tipo de rede dos parâmetros de rota.
-  // Em produção virá do contexto de autenticação (auth context/store).
-  // Para testes: navigate para /(professional)/home?network=private
-  const params = useLocalSearchParams<{ network?: string }>();
-  const network = (params.network ?? 'public') as 'public' | 'private';
+  // Rede de atuação e dados do profissional — vêm da sessão autenticada
+  const { professional } = useAuth();
+  const network = (professional?.networkType ?? 'public') as 'public' | 'private';
   const isPublic  = network === 'public';
   const isPrivate = network === 'private';
 
-  // Profissional mockado conforme a rede
-  const professional = isPublic ? mockProfessionalPublic : mockProfessionalPrivate;
-  const [publicQueue, setPublicQueue] = useState<PublicQueuePatient[]>(getPublicVaccinationQueue());
+  const [publicQueue, setPublicQueue]         = useState<PublicQueuePatient[]>([]);
+  const [todayAppointments, setTodayAppointments] = useState<AppointmentItem[]>([]);
+  const [campaigns, setCampaigns]             = useState<Campaign[]>([]);
+  const [stock, setStock]                     = useState<StockItem[]>([]);
 
   useFocusEffect(
     useCallback(() => {
-      setPublicQueue(getPublicVaccinationQueue());
-    }, [])
+      let active = true;
+
+      if (isPublic) {
+        getPublicVaccinationQueue().then(q => { if (active) setPublicQueue(q); }).catch(() => {});
+        listCampaigns().then(c => { if (active) setCampaigns(c); }).catch(() => {});
+        listStock().then(s => { if (active) setStock(s); }).catch(() => {});
+      } else {
+        const todayStr = new Date().toISOString().split('T')[0];
+        listAppointments(todayStr).then(a => { if (active) setTodayAppointments(a); }).catch(() => {});
+      }
+
+      return () => { active = false; };
+    }, [isPublic])
   );
 
   // ── Handlers de navegação (todos usam ID) ────────────────
@@ -100,14 +104,14 @@ export default function ProfessionalHome() {
       params: { patientId: item.patient.id, network, queueId: item.id },
     });
 
-  // ── Dados calculados (virão da API futuramente) ──────────
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayAppointments = mockAppointments.filter(a => a.date === todayStr);
-  // Mock: pacientes atendidos hoje (rede pública — futuramente: GET /stats/today)
-  const todayPatients = 7;
-  // Mock: "atendimentos concluídos" = appointments de hoje com status 'done'
-  const todayDone     = todayAppointments.filter(a => a.status === 'done').length;
-  // Mock: vacinas registradas hoje = igual aos atendimentos realizados (simplificado)
+  // ── Dados calculados a partir da API ──────────────────────
+  const lowStockCount  = stock.filter(s => s.quantity < s.minLevel).length;
+  const activeCampaign = campaigns[0];
+  // Atendimentos concluídos hoje (rede privada) — vira base para o card de "vacinas registradas"
+  const todayDone = todayAppointments.filter(a => a.status === 'done').length;
+  // TODO: quando houver um endpoint de estatísticas do dia (GET /stats/today),
+  // trocar estes dois valores por dados reais agregados no backend.
+  const todayPatients = isPublic ? publicQueue.length : todayAppointments.length;
   const todayVaccines = todayDone;
 
   // ============================================================
@@ -120,7 +124,7 @@ export default function ProfessionalHome() {
         {[
           { icon: 'people',        value: todayPatients,     label: 'Pacientes\nHoje',      color: Colors.PROFESSIONAL, alert: false },
           { icon: 'medical',       value: todayVaccines,     label: 'Vacinas\nRegistradas', color: Colors.PRIMARY,      alert: false },
-          { icon: 'megaphone',     value: mockCampaigns.length, label: 'Campanhas\nAtivas', color: Colors.STATUS.PENDING, alert: false },
+          { icon: 'megaphone',     value: campaigns.length, label: 'Campanhas\nAtivas', color: Colors.STATUS.PENDING, alert: false },
           { icon: 'warning',       value: lowStockCount,     label: 'Estoque\nBaixo',       color: Colors.STATUS.OVERDUE, alert: lowStockCount > 0 },
         ].map((s, i) => (
           <Animated.View key={s.label} entering={FadeInDown.delay(100 + i * 70).duration(400)} style={{ flex: 1 }}>
@@ -274,10 +278,10 @@ export default function ProfessionalHome() {
         {/* ── HEADER ───────────────────────────────────────── */}
         <Animated.View entering={FadeIn.duration(500)}>
           <ProfessionalHeader
-            name={professional.name}
-            role={professional.role}
-            unit={isPublic ? professional.unit : (professional.institution ?? '')}
-            networkType={professional.networkType}
+            name={professional?.name ?? ''}
+            role={professional?.role ?? ''}
+            unit={isPublic ? (professional?.unit ?? '') : (professional?.institution ?? '')}
+            networkType={network}
             onAvatarPress={() => router.push('/(professional)/settings')}
           />
         </Animated.View>

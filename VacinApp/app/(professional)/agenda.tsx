@@ -8,18 +8,19 @@
 // ROTA: /app/(professional)/agenda.tsx
 // ============================================================
 
-import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, SlideInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar, DateData } from 'react-native-calendars';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Colors } from '../../constants/Colors';
-import { AppointmentStatus, mockAppointments, TODAY_ISO } from '../../constants/MockData';
+import { AppointmentItem, AppointmentStatus, TODAY_ISO } from '../../constants/MockData';
 import { AppointmentCard } from '../../components/professional';
+import { listAppointments } from '../../services/api/appointments';
 
 type FilterType = 'all' | AppointmentStatus;
 
@@ -33,6 +34,21 @@ const FILTERS: { key: FilterType; label: string }[] = [
 export default function ProfessionalAgendaScreen() {
   const [selectedDate, setSelectedDate] = useState<string>(TODAY_ISO);
   const [filter, setFilter]             = useState<FilterType>('all');
+  const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
+  const [loading, setLoading]           = useState(true);
+
+  // Recarrega todos os agendamentos do profissional sempre que a tela ganha foco
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setLoading(true);
+      listAppointments()
+        .then(a => { if (active) setAppointments(a); })
+        .catch(() => { if (active) setAppointments([]); })
+        .finally(() => { if (active) setLoading(false); });
+      return () => { active = false; };
+    }, [])
+  );
 
   // Navega para o perfil do paciente
   const goToPatientProfile = (patientId: string) => {
@@ -46,7 +62,7 @@ export default function ProfessionalAgendaScreen() {
   const markedDates = useMemo(() => {
     const marks: Record<string, any> = {};
 
-    mockAppointments.forEach(apt => {
+    appointments.forEach(apt => {
       if (!apt.date) return;
       if (!marks[apt.date]) {
         marks[apt.date] = { dots: [] };
@@ -69,12 +85,12 @@ export default function ProfessionalAgendaScreen() {
     };
 
     return marks;
-  }, [selectedDate]);
+  }, [selectedDate, appointments]);
 
   // Agendamentos filtrados para a data selecionada
   const dateAppointments = useMemo(() => {
-    return mockAppointments.filter(apt => apt.date === selectedDate);
-  }, [selectedDate]);
+    return appointments.filter(apt => apt.date === selectedDate);
+  }, [selectedDate, appointments]);
 
   // Aplica o filtro de status sobre os agendamentos da data
   const filteredAppointments = useMemo(() => {
@@ -110,6 +126,7 @@ export default function ProfessionalAgendaScreen() {
               <Text style={styles.title}>Agenda de Agendamentos</Text>
               <Text style={styles.subtitle}>Consultas e vacinações da Rede Privada</Text>
             </View>
+            {loading && <ActivityIndicator size="small" color={Colors.PROFESSIONAL} style={{ marginLeft: 'auto' }} />}
           </View>
         </Animated.View>
 

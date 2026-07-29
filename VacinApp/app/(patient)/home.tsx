@@ -35,28 +35,29 @@ import { Colors } from '../../constants/Colors';
 // --- Componentes internos do projeto ---
 import { VaccineCard } from '../../components/VaccineCard';
 
-// --- Dados mockados (simulam retorno de API) ---
-import { mockVaccines } from '../../constants/MockData';
-
-// -------------------------------------------------------
-// DADOS CALCULADOS A PARTIR DOS DADOS MOCKADOS
-// Em produção, esses cálculos virão do back-end Python
-// -------------------------------------------------------
-const USER_NAME = 'Ana Clara'; // Nome do usuário logado (será dinâmico futuramente)
-
-// Contadores de status das vacinas
-const pending  = mockVaccines.filter(v => v.status === 'pending').length;  // Quantidade pendente
-const overdue  = mockVaccines.filter(v => v.status === 'overdue').length;  // Quantidade atrasada
-const complete = mockVaccines.filter(v => v.status === 'complete').length; // Quantidade em dia
-
-// Listas filtradas para exibição na tela
-const upcoming = mockVaccines.filter(v => v.status !== 'complete'); // Próximas a tomar
-const recent   = mockVaccines.filter(v => v.status === 'complete').slice(0, 3); // 3 últimas tomadas
+// --- Sessão do paciente autenticado (perfil já carregado no login) ---
+import { useAuth } from '../../contexts/AuthContext';
 
 // -------------------------------------------------------
 // COMPONENTE PRINCIPAL: Home do Paciente
 // -------------------------------------------------------
 export default function PatientHome() {
+  const { patient } = useAuth();
+
+  // Primeiro nome, para a saudação (ex.: "Ana Clara Souza" -> "Ana Clara")
+  const firstName = (patient?.name ?? '').split(' ').slice(0, 2).join(' ') || 'Paciente';
+
+  const vaccines = patient?.vaccines ?? [];
+
+  // Contadores de status das vacinas
+  const pending  = vaccines.filter(v => v.status === 'pending').length;  // Quantidade pendente
+  const overdue  = vaccines.filter(v => v.status === 'overdue').length;  // Quantidade atrasada
+  const complete = vaccines.filter(v => v.status === 'complete').length; // Quantidade em dia
+
+  // Listas filtradas para exibição na tela
+  const upcoming = vaccines.filter(v => v.status !== 'complete'); // Próximas a tomar
+  const recent   = vaccines.filter(v => v.status === 'complete').slice(0, 3); // 3 últimas tomadas
+
   return (
     // Container principal com área segura
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -67,11 +68,11 @@ export default function PatientHome() {
         {/* ---- HEADER ROXO: Saudação + Avatar ---- */}
         <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Olá, {USER_NAME} 👋</Text>
+            <Text style={styles.greeting}>Olá, {firstName} 👋</Text>
             <Text style={styles.subgreeting}>Confira seu histórico vacinal</Text>
           </View>
-          {/* Avatar clicável (futuramente abre o perfil) */}
-          <TouchableOpacity style={styles.avatar}>
+          {/* Avatar clicável — vai para o perfil */}
+          <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(patient)/profile')}>
             <Ionicons name="person" size={24} color={Colors.PRIMARY} />
           </TouchableOpacity>
         </Animated.View>
@@ -101,35 +102,43 @@ export default function PatientHome() {
         {/* ---- SEÇÃO: Próximas Vacinas (scroll horizontal) ---- */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.section}>
           <Text style={styles.sectionTitle}>Próximas Vacinas</Text>
-          {/* Scroll horizontal para exibir múltiplos cards de vacinas pendentes */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 20 }}>
-            {upcoming.map((v, i) => (
-              <Animated.View key={v.id} entering={FadeInDown.delay(250 + i * 60).duration(400)}>
-                {/* Card no modo horizontal (exibição compacta) */}
-                <VaccineCard vaccine={v} horizontal />
-              </Animated.View>
-            ))}
-          </ScrollView>
+          {upcoming.length === 0 ? (
+            <Text style={styles.emptyText}>Nenhuma vacina pendente ou atrasada. 🎉</Text>
+          ) : (
+            /* Scroll horizontal para exibir múltiplos cards de vacinas pendentes */
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 20 }}>
+              {upcoming.map((v, i) => (
+                <Animated.View key={v.id} entering={FadeInDown.delay(250 + i * 60).duration(400)}>
+                  {/* Card no modo horizontal (exibição compacta) */}
+                  <VaccineCard vaccine={v} horizontal />
+                </Animated.View>
+              ))}
+            </ScrollView>
+          )}
         </Animated.View>
 
         {/* ---- SEÇÃO: Histórico Recente (últimas 3 vacinas tomadas) ---- */}
         <Animated.View entering={FadeInDown.delay(350).duration(500)} style={[styles.section, { paddingHorizontal: 20 }]}>
           <Text style={styles.sectionTitle}>Histórico Recente</Text>
-          {recent.map((v, i) => (
-            <Animated.View key={v.id} entering={FadeInDown.delay(400 + i * 70).duration(400)}>
-              {/* Card no modo vertical (exibição completa) */}
-              <VaccineCard vaccine={v} />
-            </Animated.View>
-          ))}
+          {recent.length === 0 ? (
+            <Text style={styles.emptyText}>Nenhuma vacina registrada ainda.</Text>
+          ) : (
+            recent.map((v, i) => (
+              <Animated.View key={v.id} entering={FadeInDown.delay(400 + i * 70).duration(400)}>
+                {/* Card no modo vertical (exibição completa) */}
+                <VaccineCard vaccine={v} />
+              </Animated.View>
+            ))
+          )}
         </Animated.View>
 
         {/* Espaço extra para não ficar colado na tab bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* ---- FAB (Botão Flutuante): Adicionar nova vacina ---- */}
+      {/* ---- FAB (Botão Flutuante): Localizar posto para se vacinar ---- */}
       {/* Botão circular fixo no canto inferior direito */}
-      <TouchableOpacity style={styles.fab}>
+      <TouchableOpacity style={styles.fab} onPress={() => router.push('/(patient)/map')}>
         <Ionicons name="add" size={28} color={Colors.NEUTRAL.WHITE} />
       </TouchableOpacity>
     </SafeAreaView>
@@ -160,6 +169,7 @@ const styles = StyleSheet.create({
   // === SEÇÕES DE CONTEÚDO ===
   section:      { marginTop: 24 },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: Colors.NEUTRAL.DARK_TEXT, marginBottom: 14, paddingHorizontal: 20 },
+  emptyText:    { fontSize: 13, color: Colors.NEUTRAL.MUTED, paddingHorizontal: 20 },
 
   // === BOTÃO FLUTUANTE (FAB) ===
   fab:          { position: 'absolute', bottom: 30, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.PRIMARY, alignItems: 'center', justifyContent: 'center', shadowColor: Colors.PRIMARY, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
@@ -19,7 +19,10 @@ import {
   addPatientToPublicQueue,
   findPatientBySus,
   getPublicVaccinationQueue,
+  type PublicQueuePatient,
 } from '../../services/PublicQueueStore';
+import { useAuth } from '../../contexts/AuthContext';
+import { ApiError } from '../../services/api/client';
 
 const formatSusNumber = (text: string) => {
   const digits = text.replace(/\D/g, '').slice(0, 15);
@@ -30,11 +33,20 @@ const formatSusNumber = (text: string) => {
 };
 
 export default function UnitTriageScreen() {
+  const { unit, logout } = useAuth();
+
   const [sus, setSus] = useState('');
   const [error, setError] = useState('');
+  const [searching, setSearching] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<PatientProfile | undefined>();
-  const [queue, setQueue] = useState(getPublicVaccinationQueue());
+  const [queue, setQueue] = useState<PublicQueuePatient[]>([]);
   const [successMessage, setSuccessMessage] = useState('');
+
+  const reloadQueue = useCallback(() => {
+    getPublicVaccinationQueue().then(setQueue).catch(() => {});
+  }, []);
+
+  useFocusEffect(useCallback(() => { reloadQueue(); }, [reloadQueue]));
 
   const handleSusChange = (text: string) => {
     setSus(formatSusNumber(text));
@@ -42,7 +54,7 @@ export default function UnitTriageScreen() {
     setSuccessMessage('');
   };
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     const query = sus.replace(/\D/g, '');
 
     if (query.length < 15) {
@@ -51,26 +63,40 @@ export default function UnitTriageScreen() {
       return;
     }
 
-    const patient = findPatientBySus(query);
-
-    if (!patient) {
-      setError('Nenhum paciente encontrado com esse número do SUS.');
-      setSelectedPatient(undefined);
-      return;
+    setSearching(true);
+    try {
+      const patient = await findPatientBySus(query);
+      if (!patient) {
+        setError('Nenhum paciente encontrado com esse número do SUS.');
+        setSelectedPatient(undefined);
+        return;
+      }
+      setSelectedPatient(patient);
+      setError('');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Não foi possível buscar o paciente.');
+    } finally {
+      setSearching(false);
     }
-
-    setSelectedPatient(patient);
-    setError('');
   };
 
-  const handleAddToQueue = () => {
+  const handleAddToQueue = async () => {
     if (!selectedPatient) return;
 
-    addPatientToPublicQueue(selectedPatient.id, 'Vacinação');
-    setQueue(getPublicVaccinationQueue());
-    setSuccessMessage(`${selectedPatient.name} foi adicionado à fila de vacinação.`);
-    setSelectedPatient(undefined);
-    setSus('');
+    try {
+      await addPatientToPublicQueue(selectedPatient.id, 'Vacinação');
+      reloadQueue();
+      setSuccessMessage(`${selectedPatient.name} foi adicionado à fila de vacinação.`);
+      setSelectedPatient(undefined);
+      setSus('');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Não foi possível adicionar à fila.');
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(auth)/login');
   };
 
   return (
@@ -79,11 +105,11 @@ export default function UnitTriageScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <Animated.View entering={FadeIn.duration(450)} style={styles.header}>
           <View>
-            <Text style={styles.headerKicker}>UBS Jardim América</Text>
+            <Text style={styles.headerKicker}>{unit?.name ?? 'Unidade de Saúde'}</Text>
             <Text style={styles.headerTitle}>Triagem de Vacinação</Text>
             <Text style={styles.headerSubtitle}>Identifique o paciente e organize a fila da sala de vacina.</Text>
           </View>
-          <TouchableOpacity style={styles.logoutBtn} onPress={() => router.replace('/(auth)/login')} hitSlop={12}>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} hitSlop={12}>
             <Ionicons name="log-out-outline" size={20} color={Colors.PROFESSIONAL} />
           </TouchableOpacity>
         </Animated.View>
@@ -110,7 +136,7 @@ export default function UnitTriageScreen() {
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          <PrimaryButton label="Buscar paciente" onPress={handleSearch} variant="professional" />
+          <PrimaryButton label={searching ? 'Buscando...' : 'Buscar paciente'} onPress={handleSearch} variant="professional" disabled={searching} />
         </Animated.View>
 
         {selectedPatient && (
