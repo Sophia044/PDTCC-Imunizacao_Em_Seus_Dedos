@@ -2,6 +2,12 @@
 // TELA: Escolha do Tipo de Cadastro
 // DESCRIÇÃO: Permite ao paciente escolher entre cadastro
 //            pela Rede Pública (SUS) ou Rede Privada (Convênio).
+//
+// CORREÇÃO: register-professional.tsx existia mas não era
+// acessível de lugar nenhum do app (nenhuma tela linkava para
+// ele) — o cadastro de profissional era, na prática,
+// inalcançável. Foi adicionado o link "É profissional de
+// saúde? Cadastre-se aqui" abaixo do aviso informativo.
 // ACESSO: Paciente (novo usuário)
 // ROTA: /app/(auth)/choose-registration.tsx
 // ============================================================
@@ -124,6 +130,14 @@ export default function ChooseRegistrationScreen() {
           </Text>
         </Animated.View>
 
+        {/* ---- LINK: CADASTRO DE PROFISSIONAL (NOVO) ---- */}
+        <Animated.View entering={FadeInDown.delay(480).duration(600)} style={styles.loginRow}>
+          <Text style={styles.loginText}>É profissional de saúde? </Text>
+          <TouchableOpacity onPress={() => router.push('/(auth)/register-professional')}>
+            <Text style={styles.loginLink}>Cadastre-se aqui</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
         {/* ---- LINK: JÁ TEM CONTA ---- */}
         <Animated.View entering={FadeInDown.delay(500).duration(600)} style={styles.loginRow}>
           <Text style={styles.loginText}>Já tem conta? </Text>
@@ -189,8 +203,8 @@ const styles = StyleSheet.create({
   infoBox:         { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: Colors.NEUTRAL.WHITE, borderRadius: 12, padding: 14, marginBottom: 24, borderWidth: 1, borderColor: Colors.BORDER },
   infoText:        { flex: 1, fontSize: 13, color: Colors.NEUTRAL.MUTED, lineHeight: 19 },
 
-  // Link de login
-  loginRow:        { flexDirection: 'row', justifyContent: 'center' },
+  // Link de login / cadastro profissional
+  loginRow:        { flexDirection: 'row', justifyContent: 'center', marginBottom: 8 },
   loginText:       { fontSize: 14, color: Colors.NEUTRAL.MUTED },
   loginLink:       { fontSize: 14, fontWeight: '700', color: Colors.PRIMARY },
 });
