@@ -73,10 +73,10 @@ Senha de todas: **`senha1234`**
 | Profissional (rede privada)  | `ricardo.oliveira@vidasaude.com` · registro `CRM/SP-98765` · instituição `Clínica Vida Saúde` |
 | Unidade de Saúde (triagem)   | CNES `1234567` · usuário `recepcao@ubscentral.gov.br`      |
 
-> **Rede Privada agora exige a instituição no login.** O valor informado no
-> campo "Instituição" precisa ser exatamente o nome da unidade de saúde
-> vinculada ao profissional (tabela `professional_health_units`), que é a
-> mesma unidade indicada no cadastro (`unitName`). Se o profissional estiver
+> **Rede Privada exige a instituição no login.** O valor informado no campo
+> "Instituição" precisa ser exatamente o nome da unidade de saúde vinculada
+> ao profissional (tabela `professional_health_units`), que é a mesma
+> unidade indicada no cadastro (`unitName`). Se o profissional estiver
 > vinculado a mais de uma unidade ativa, apenas o vínculo ativo mais recente
 > é considerado.
 
@@ -112,7 +112,7 @@ backend/
 │   └── routers/
 │       ├── auth.py             # login e cadastro (paciente, profissional, unidade)
 │       ├── patients.py          # perfil do paciente + busca/listagem pelo profissional
-│       ├── professionals.py      # perfil do profissional autenticado
+│       ├── professionals.py      # perfil do profissional autenticado + confirmação de CRM/COREN
 │       ├── vaccines.py             # catálogo de vacinas
 │       ├── vaccinations.py          # registrar/consultar doses aplicadas
 │       ├── appointments.py           # agenda
@@ -153,6 +153,25 @@ backend/
   fictícios (criados no cadastro via `_get_or_create_unit` ou no `seed.py`);
   não há um diretório real de instituições — a "ligação" é feita pelo nome
   já cadastrado.
+- **Unidade de saúde no registro de vacinação** — antes, o campo "Local de
+  aplicação" da tela de Registrar Vacinação era puramente decorativo: o
+  texto digitado nunca era enviado nem validado, e o backend sempre gravava
+  a unidade vinculada ao profissional (`_professional_active_unit`),
+  independente do que aparecia na tela. Agora isso é resolvido de ponta a
+  ponta:
+  - `GET /professionals/me` retorna `healthUnitId`, usado pelo front-end
+    para pré-preencher/travar o campo com a unidade real do profissional.
+  - `POST /professionals/me/verify-registry` confere se o CRM/COREN
+    reenviado bate com o cadastro do profissional autenticado — é a
+    "certificação" que libera a troca de unidade na tela. Não substitui o
+    login (o token JWT continua sendo a autenticação), é apenas uma
+    segunda confirmação explícita antes de uma ação sensível.
+  - `POST /vaccinations` passa a receber `healthUnitId` (opcional; se
+    omitido, usa a unidade do profissional) em vez do antigo `location`
+    de texto livre. O backend sempre valida que o `healthUnitId` recebido
+    corresponde a uma unidade ativa cadastrada em `health_units` — nunca
+    aceita texto arbitrário — então o registro só é possível com uma
+    unidade de saúde válida.
 
 ## Rotas principais
 
@@ -167,10 +186,12 @@ Veja a lista completa e testável em `/docs`. Resumo:
 | `POST /auth/unit/login` | público | login da unidade (triagem) |
 | `GET /patients/me` | paciente | próprio histórico vacinal |
 | `GET /patients`, `/patients/search`, `/patients/{id}` | profissional | listar/buscar/abrir paciente |
+| `GET /professionals/me` | profissional | perfil autenticado (inclui `healthUnitId`) |
+| `POST /professionals/me/verify-registry` | profissional | confirma CRM/COREN para liberar troca de unidade no registro de vacinação |
 | `GET /vaccines` | qualquer autenticado | catálogo de vacinas |
-| `POST /vaccinations` | profissional | registrar dose aplicada |
+| `POST /vaccinations` | profissional | registrar dose aplicada (usa `healthUnitId`, com fallback para a unidade do profissional) |
 | `GET /appointments` | profissional | agenda |
 | `PATCH /appointments/{id}` | profissional | atualizar status da consulta |
-| `GET /health-units` | público | unidades para o mapa |
+| `GET /health-units` | público | unidades para o mapa e para seleção no registro de vacinação |
 | `GET /queue`, `POST /queue`, `POST /queue/{id}/call`, `DELETE /queue/{id}` | unidade/profissional | fila pública |
 | `GET /campaigns`, `GET /stock` | profissional | campanhas e estoque da unidade |

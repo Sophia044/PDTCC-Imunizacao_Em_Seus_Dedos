@@ -13,6 +13,15 @@
 //            Após salvar, exibe SuccessModal animado e volta
 //            automaticamente para o perfil do paciente.
 //
+//            UNIDADE DE SAÚDE:
+//            O campo vem travado, preenchido com a unidade de
+//            saúde vinculada ao profissional autenticado (a mesma
+//            usada no cadastro/login). Para trocar, o profissional
+//            precisa reconfirmar o próprio CRM/COREN; só então o
+//            campo vira uma seleção entre as unidades realmente
+//            cadastradas (nunca texto livre). O envio só é
+//            permitido com uma unidade válida selecionada.
+//
 // PREPARADO PARA BACKEND:
 //   Em produção, o botão "Registrar Vacinação" chamará:
 //   POST /vaccinations com o payload abaixo.
@@ -25,7 +34,7 @@
 //     manufacturer: string,
 //     lot: string,
 //     date: string,        // DD/MM/YYYY
-//     location: string,
+//     healthUnitId: string,
 //     notes: string,
 //     networkType: string,
 //   }
@@ -48,7 +57,7 @@ import { Colors } from '../../constants/Colors';
 import { InputField } from '../../components/InputField';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { availableManufacturers } from '../../constants/MockData';
-import type { PatientProfile } from '../../constants/MockData';
+import type { HealthUnit, PatientProfile } from '../../constants/MockData';
 import { PatientContextCard, SuccessModal } from '../../components/professional';
 import {
   getPublicVaccinationQueue,
@@ -59,7 +68,10 @@ import type { PublicQueuePatient } from '../../services/PublicQueueStore';
 import { getPatientProfile } from '../../services/api/patients';
 import { listVaccineNames } from '../../services/api/vaccines';
 import { registerVaccination } from '../../services/api/vaccinations';
+import { listHealthUnits } from '../../services/api/healthUnits';
+import { verifyProfessionalRegistry } from '../../services/api/professionals';
 import { ApiError } from '../../services/api/client';
+import { useAuth } from '../../contexts/AuthContext';
 
 // -------------------------------------------------------
 // Sub-componente: Seletor tipo dropdown
@@ -119,6 +131,98 @@ const dd = StyleSheet.create({
 });
 
 // -------------------------------------------------------
+// Sub-componente: Card "Unidade de Saúde" (travado por padrão)
+// -------------------------------------------------------
+type UnitEditMode = 'locked' | 'verifying' | 'unlocked';
+
+const unitStyles = StyleSheet.create({
+  lockedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Colors.CARD_BG,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.BORDER,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  lockedIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.PROFESSIONAL_LIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  lockedName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.NEUTRAL.DARK_TEXT,
+  },
+  lockedAddress: {
+    fontSize: 11,
+    color: Colors.NEUTRAL.MUTED,
+    marginTop: 2,
+  },
+  changeLink: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.PROFESSIONAL,
+  },
+  verifyHint: {
+    fontSize: 12,
+    color: Colors.NEUTRAL.MUTED,
+    marginBottom: 10,
+    lineHeight: 17,
+  },
+  verifyError: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.STATUS.OVERDUE,
+    marginTop: -6,
+    marginBottom: 10,
+  },
+  verifyActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  cancelBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.BORDER,
+  },
+  cancelBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.NEUTRAL.MUTED,
+  },
+  confirmBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: Colors.PROFESSIONAL,
+  },
+  confirmBtnDisabled: {
+    opacity: 0.6,
+  },
+  confirmBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.NEUTRAL.WHITE,
+  },
+  useOwnUnitLink: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+});
+
+// -------------------------------------------------------
 // COMPONENTE PRINCIPAL
 // -------------------------------------------------------
 export default function RegisterVaccineScreen() {
@@ -126,6 +230,11 @@ export default function RegisterVaccineScreen() {
   const initialPatientId = params.patientId;
   const network   = params.network ?? 'public';
   const initialQueueId = params.queueId;
+
+  // Sessão do profissional autenticado — fornece a unidade de saúde
+  // padrão (healthUnitId) usada para travar o campo de unidade.
+  const { professional } = useAuth();
+
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(initialPatientId);
   const [activeQueueId, setActiveQueueId] = useState<string | undefined>(
     initialQueueId ? String(initialQueueId) : undefined
@@ -140,6 +249,74 @@ export default function RegisterVaccineScreen() {
   useEffect(() => {
     listVaccineNames().then(setVaccineOptions).catch(() => {});
   }, []);
+
+  // Unidades de saúde cadastradas — carregadas uma vez do backend.
+  // São a única fonte possível de opções ao trocar de unidade: o
+  // profissional nunca digita um nome livre, só seleciona uma
+  // unidade real desta lista.
+  const [healthUnits, setHealthUnits] = useState<HealthUnit[]>([]);
+  useEffect(() => {
+    listHealthUnits().then(setHealthUnits).catch(() => {});
+  }, []);
+
+  // Unidade de saúde selecionada para o registro. Começa travada na
+  // unidade vinculada ao profissional (professional.healthUnitId).
+  const [selectedUnit, setSelectedUnit] = useState<HealthUnit | undefined>(undefined);
+  const [unitEditMode, setUnitEditMode] = useState<UnitEditMode>('locked');
+  const [unitVerifyRegistry, setUnitVerifyRegistry] = useState('');
+  const [unitVerifyError, setUnitVerifyError] = useState('');
+  const [unitVerifying, setUnitVerifying] = useState(false);
+  const [showUnitDropdown, setShowUnitDropdown] = useState(false);
+
+  // Assim que a lista de unidades e o profissional estiverem
+  // disponíveis, pré-seleciona a unidade vinculada a ele.
+  useEffect(() => {
+    if (selectedUnit || healthUnits.length === 0) return;
+    const ownUnit = professional?.healthUnitId
+      ? healthUnits.find(u => u.id === professional.healthUnitId)
+      : undefined;
+    if (ownUnit) setSelectedUnit(ownUnit);
+  }, [healthUnits, professional, selectedUnit]);
+
+  const resetUnitToOwn = useCallback(() => {
+    setUnitEditMode('locked');
+    setUnitVerifyRegistry('');
+    setUnitVerifyError('');
+    setShowUnitDropdown(false);
+    const ownUnit = professional?.healthUnitId
+      ? healthUnits.find(u => u.id === professional.healthUnitId)
+      : undefined;
+    setSelectedUnit(ownUnit);
+  }, [professional, healthUnits]);
+
+  const startUnitChange = () => {
+    setUnitEditMode('verifying');
+    setUnitVerifyRegistry('');
+    setUnitVerifyError('');
+  };
+
+  const cancelUnitChange = () => {
+    resetUnitToOwn();
+  };
+
+  const confirmUnitChange = async () => {
+    if (!unitVerifyRegistry.trim()) {
+      setUnitVerifyError('Informe seu CRM ou COREN para liberar a troca.');
+      return;
+    }
+    setUnitVerifying(true);
+    try {
+      await verifyProfessionalRegistry(unitVerifyRegistry.trim());
+      setUnitEditMode('unlocked');
+      setUnitVerifyError('');
+    } catch (err) {
+      setUnitVerifyError(
+        err instanceof ApiError ? err.message : 'Não foi possível confirmar o registro. Tente novamente.'
+      );
+    } finally {
+      setUnitVerifying(false);
+    }
+  };
 
   const reloadQueue = useCallback(() => {
     getPublicVaccinationQueue().then(setPublicQueue).catch(() => {});
@@ -178,7 +355,6 @@ export default function RegisterVaccineScreen() {
   const [manufacturer, setManufacturer] = useState('');
   const [lot,          setLot]          = useState('');
   const [date,         setDate]         = useState('');
-  const [location,     setLocation]     = useState('');
   const [notes,        setNotes]        = useState('');
 
   // ── Estados de controle de UI ────────────────────────────
@@ -252,10 +428,12 @@ export default function RegisterVaccineScreen() {
     setManufacturer('');
     setLot('');
     setDate('');
-    setLocation('');
     setNotes('');
     setShowVaccine(false);
     setShowManufacturer(false);
+    // A unidade de saúde volta a ser a vinculada ao profissional,
+    // travada novamente para o próximo registro.
+    resetUnitToOwn();
   };
 
   // ── Validação e envio ────────────────────────────────────
@@ -270,6 +448,14 @@ export default function RegisterVaccineScreen() {
       return;
     }
 
+    if (!selectedUnit) {
+      Alert.alert(
+        'Unidade de saúde obrigatória',
+        'Selecione uma unidade de saúde válida. Se necessário, confirme seu CRM/COREN para trocar de unidade.'
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       await registerVaccination({
@@ -279,7 +465,7 @@ export default function RegisterVaccineScreen() {
         manufacturer,
         lot,
         date,
-        location,
+        healthUnitId: selectedUnit.id,
         notes,
         networkType: network,
       });
@@ -423,9 +609,84 @@ export default function RegisterVaccineScreen() {
             </Animated.View>
           )}
 
-          {/* ── CARD: VACINA ─────────────────────────────── */}
+          {/* ── CARD: UNIDADE DE SAÚDE ───────────────────── */}
           {patient && (
             <>
+          <Animated.View entering={FadeInDown.delay(120).duration(400)} style={styles.card}>
+            <Text style={styles.cardTitle}>Unidade de Saúde *</Text>
+
+            {unitEditMode === 'locked' && (
+              <View style={unitStyles.lockedBox}>
+                <View style={unitStyles.lockedIcon}>
+                  <Ionicons name="lock-closed" size={16} color={Colors.PROFESSIONAL} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={unitStyles.lockedName} numberOfLines={1}>
+                    {selectedUnit?.name ?? 'Nenhuma unidade vinculada ao seu cadastro'}
+                  </Text>
+                  {selectedUnit?.address && (
+                    <Text style={unitStyles.lockedAddress} numberOfLines={1}>{selectedUnit.address}</Text>
+                  )}
+                </View>
+                <TouchableOpacity onPress={startUnitChange} hitSlop={8}>
+                  <Text style={unitStyles.changeLink}>Trocar</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {unitEditMode === 'verifying' && (
+              <View>
+                <Text style={unitStyles.verifyHint}>
+                  Para registrar em outra unidade, confirme seu CRM ou COREN cadastrado.
+                </Text>
+                <InputField
+                  label="CRM ou COREN"
+                  value={unitVerifyRegistry}
+                  onChangeText={setUnitVerifyRegistry}
+                  icon="card-outline"
+                  placeholder="Digite seu registro profissional"
+                  autoCapitalize="none"
+                />
+                {unitVerifyError ? <Text style={unitStyles.verifyError}>{unitVerifyError}</Text> : null}
+                <View style={unitStyles.verifyActions}>
+                  <TouchableOpacity style={unitStyles.cancelBtn} onPress={cancelUnitChange}>
+                    <Text style={unitStyles.cancelBtnText}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[unitStyles.confirmBtn, unitVerifying && unitStyles.confirmBtnDisabled]}
+                    onPress={confirmUnitChange}
+                    disabled={unitVerifying}
+                  >
+                    <Text style={unitStyles.confirmBtnText}>{unitVerifying ? 'Verificando...' : 'Confirmar'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {unitEditMode === 'unlocked' && (
+              <View>
+                <DropdownSelector
+                  label="Unidade de saúde"
+                  value={selectedUnit?.name ?? ''}
+                  options={healthUnits.map(u => u.name)}
+                  isOpen={showUnitDropdown}
+                  onToggle={() => setShowUnitDropdown(v => !v)}
+                  onSelect={(name) => {
+                    const unit = healthUnits.find(u => u.name === name);
+                    if (unit) setSelectedUnit(unit);
+                    setShowUnitDropdown(false);
+                  }}
+                  icon="business-outline"
+                  placeholder="Selecionar unidade de saúde"
+                />
+                <TouchableOpacity style={unitStyles.useOwnUnitLink} onPress={cancelUnitChange} hitSlop={8}>
+                  <Text style={unitStyles.changeLink}>Usar minha unidade novamente</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </Animated.View>
+
+          {/* ── CARD: VACINA ─────────────────────────────── */}
           <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.card}>
             <Text style={styles.cardTitle}>Vacina Administrada *</Text>
 
@@ -484,13 +745,6 @@ export default function RegisterVaccineScreen() {
               icon="barcode-outline"
               placeholder="Ex: ABC123456"
               autoCapitalize="none"
-            />
-            <InputField
-              label="Local de aplicação"
-              value={location}
-              onChangeText={setLocation}
-              icon="location-outline"
-              placeholder="Ex: UBS Jardim América"
             />
             <InputField
               label="Observações"

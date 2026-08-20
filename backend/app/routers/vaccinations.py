@@ -2,17 +2,6 @@
 # ROUTER: Registro de vacinação
 # Endpoint principal usado pela tela "Registrar Vacinação"
 # (app/(professional)/register-vaccine.tsx).
-#
-# CORREÇÕES:
-# 1) Bloqueia registrar a MESMA vacina/dose/data duas vezes para
-#    o mesmo paciente (evita duplo clique / reenvio criando dois
-#    registros válidos de uma vacinação que já foi aplicada).
-# 2) Quando a dose aplicada corresponde a um agendamento
-#    "scheduled" do paciente para aquela vacina, o agendamento é
-#    marcado como "done" automaticamente. Sem isso, a agenda do
-#    profissional (app/(professional)/agenda.tsx) nunca refletia
-#    o registro da vacinação, e o paciente continuava aparecendo
-#    como "aguardando"/pendente mesmo após ser vacinado.
 # ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -42,23 +31,35 @@ def _professional_active_unit(db: Session, professional: models.Professional) ->
     return link.health_unit
 
 
-def _mark_matching_appointment_done(db: Session, patient: models.Patient, vaccine: models.Vaccine) -> None:
+def _resolve_health_unit(
+    db: Session, professional: models.Professional, health_unit_id: str | None
+) -> models.HealthUnit:
     """
-    Quando a dose é efetivamente aplicada, o agendamento dessa
-    mesma vacina para o paciente deixa de ser "pendente" — isso
-    alimenta tanto a agenda do profissional (rede privada) quanto
-    o cálculo de pendências/atrasos do paciente, já que ambos
-    derivam de `appointments` com status "scheduled"
-    (ver utils.build_patient_vaccine_history).
+    Determina a unidade de saúde do registro de vacinação.
+
+    - Se `health_unit_id` não for informado, usa a unidade vinculada
+      ao profissional autenticado (comportamento padrão/travado da
+      tela de registro).
+    - Se for informado, precisa ser o ID de uma unidade ativa
+      realmente cadastrada em `health_units` — nunca um texto livre.
+      O front-end só permite essa troca depois de o profissional
+      confirmar o próprio CRM/COREN em POST /professionals/me/verify-registry
+      e selecionar a unidade em uma lista (não digitar livremente),
+      mas o backend valida de qualquer forma, já que é a fonte da
+      verdade.
     """
-    appointment = (
-        db.query(models.Appointment)
-        .filter_by(patient_id=patient.id, vaccine_id=vaccine.id, status="scheduled")
-        .order_by(models.Appointment.appointment_date)
-        .first()
-    )
-    if appointment is not None:
-        appointment.status = "done"
+    if not health_unit_id:
+        return _professional_active_unit(db, professional)
+
+    try:
+        unit_id = int(health_unit_id)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Unidade de saúde inválida.")
+
+    unit = db.get(models.HealthUnit, unit_id)
+    if unit is None or not unit.active:
+        raise HTTPException(400, "Unidade de saúde inválida.")
+    return unit
 
 
 @router.post("", response_model=schemas.VaccineOut, status_code=201)
@@ -72,26 +73,7 @@ def register_vaccination(
         raise HTTPException(404, "Paciente não encontrado.")
 
     vaccine = _get_or_create_vaccine(db, payload.vaccine)
-    health_unit = _professional_active_unit(db, professional)
-    application_date = utils.parse_br_date(payload.date)
-
-    # Evita registrar a mesma vacinação (vacina + dose + data) mais de uma vez
-    duplicate = (
-        db.query(models.VaccinationRecord)
-        .filter_by(
-            patient_id=patient.id,
-            vaccine_id=vaccine.id,
-            dose=payload.dose,
-            application_date=application_date,
-            status="valid",
-        )
-        .first()
-    )
-    if duplicate is not None:
-        raise HTTPException(
-            400,
-            "Esta vacinação (mesma vacina, dose e data) já foi registrada para este paciente.",
-        )
+    health_unit = _resolve_health_unit(db, professional, payload.health_unit_id)
 
     record = models.VaccinationRecord(
         patient_id=patient.id,
@@ -101,14 +83,29 @@ def register_vaccination(
         dose=payload.dose,
         manufacturer=payload.manufacturer,
         lot=payload.lot,
-        application_date=application_date,
+        application_date=utils.parse_br_date(payload.date),
         notes=payload.notes,
         network_type=payload.network_type,
     )
     db.add(record)
 
-    # Fecha o agendamento correspondente, se houver (mantém a agenda em dia)
-    _mark_matching_appointment_done(db, patient, vaccine)
+    # ----------------------------------------------------------------
+    # Ao registrar a vacina, marcar como "done" todos os agendamentos
+    # pendentes (scheduled) do mesmo paciente para essa mesma vacina.
+    # Isso garante que vacinas atrasadas (overdue) saiam do histórico
+    # assim que forem efetivamente aplicadas.
+    # ----------------------------------------------------------------
+    pending_appointments = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.patient_id == patient.id,
+            models.Appointment.vaccine_id == vaccine.id,
+            models.Appointment.status == "scheduled",
+        )
+        .all()
+    )
+    for appt in pending_appointments:
+        appt.status = "done"
 
     db.commit()
     db.refresh(record)
