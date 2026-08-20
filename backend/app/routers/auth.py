@@ -178,6 +178,26 @@ def login_professional(payload: schemas.ProfessionalLoginRequest, db: Session = 
     if not professional.user.active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Conta desativada.")
 
+    # Rede Privada: a instituição é obrigatória e precisa corresponder à
+    # unidade de saúde vinculada a este profissional em
+    # professional_health_units (ligação feita no cadastro, via
+    # _get_or_create_unit). Isso liga de fato o campo "Instituição" do
+    # login a um estabelecimento real do sistema, em vez de ser apenas
+    # texto decorativo.
+    if payload.network_type == "private":
+        institution = (payload.institution or "").strip()
+        if not institution:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Informe a instituição vinculada ao seu cadastro.",
+            )
+        link = next((l for l in professional.unit_links if l.active), None)
+        if link is None or link.health_unit.name.strip().lower() != institution.lower():
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED,
+                "Instituição não corresponde ao cadastro deste profissional.",
+            )
+
     token = create_access_token(f"professional:{professional.id}")
     return schemas.TokenResponse(token=token)
 

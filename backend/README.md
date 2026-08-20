@@ -70,8 +70,15 @@ Senha de todas: **`senha1234`**
 | Paciente SUS           | CPF `987.654.321-00`                                             |
 | Paciente Convênio       | CPF `123.456.789-00`                                              |
 | Profissional (rede pública)  | `fernanda.alves@saude.gov.br` · registro `COREN/SP-123456` |
-| Profissional (rede privada)  | `ricardo.oliveira@vidasaude.com` · registro `CRM/SP-98765` |
+| Profissional (rede privada)  | `ricardo.oliveira@vidasaude.com` · registro `CRM/SP-98765` · instituição `Clínica Vida Saúde` |
 | Unidade de Saúde (triagem)   | CNES `1234567` · usuário `recepcao@ubscentral.gov.br`      |
+
+> **Rede Privada agora exige a instituição no login.** O valor informado no
+> campo "Instituição" precisa ser exatamente o nome da unidade de saúde
+> vinculada ao profissional (tabela `professional_health_units`), que é a
+> mesma unidade indicada no cadastro (`unitName`). Se o profissional estiver
+> vinculado a mais de uma unidade ativa, apenas o vínculo ativo mais recente
+> é considerado.
 
 ## Como rodar com MySQL (produção / MySQL Workbench)
 
@@ -138,6 +145,14 @@ backend/
   por padrão — a ideia é que uma tela/rotina de aprovação por um admin possa
   ser adicionada depois sem quebrar nada (hoje o login não bloqueia por
   causa disso, mas o campo já existe pronto para essa evolução).
+- **Vínculo profissional ↔ unidade de saúde (Rede Privada)** — o campo
+  "Instituição" da tela de login do profissional, que antes era apenas
+  exibido sem validação, agora é obrigatório para `network_type = 'private'`
+  e conferido contra `professional_health_units` / `health_units` no
+  endpoint `POST /auth/professional/login`. Os estabelecimentos continuam
+  fictícios (criados no cadastro via `_get_or_create_unit` ou no `seed.py`);
+  não há um diretório real de instituições — a "ligação" é feita pelo nome
+  já cadastrado.
 
 ## Rotas principais
 
@@ -148,7 +163,7 @@ Veja a lista completa e testável em `/docs`. Resumo:
 | `POST /auth/patient/register/sus` `/private` | público | cadastro de paciente |
 | `POST /auth/patient/login` | público | login do paciente |
 | `POST /auth/professional/register` | público | cadastro de profissional |
-| `POST /auth/professional/login` | público | login do profissional |
+| `POST /auth/professional/login` | público | login do profissional (Rede Privada exige `institution`) |
 | `POST /auth/unit/login` | público | login da unidade (triagem) |
 | `GET /patients/me` | paciente | próprio histórico vacinal |
 | `GET /patients`, `/patients/search`, `/patients/{id}` | profissional | listar/buscar/abrir paciente |

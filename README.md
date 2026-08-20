@@ -278,8 +278,12 @@ Criadas automaticamente pelo `python seed.py`. Senha de todas: **`senha1234`**
 | Paciente SUS | CPF `987.654.321-00` |
 | Paciente Convênio | CPF `123.456.789-00` |
 | Profissional (rede pública) | `fernanda.alves@saude.gov.br` · registro `COREN/SP-123456` |
-| Profissional (rede privada) | `ricardo.oliveira@vidasaude.com` · registro `CRM/SP-98765` |
+| Profissional (rede privada) | `ricardo.oliveira@vidasaude.com` · registro `CRM/SP-98765` · instituição `Clínica Vida Saúde` |
 | Unidade de Saúde (triagem) | CNES `1234567` · usuário `recepcao@ubscentral.gov.br` |
+
+> ℹ️ Desde a integração do vínculo profissional ↔ unidade de saúde, o login
+> da **Rede Privada** exige o campo **Instituição**, que precisa bater
+> exatamente com o nome da unidade vinculada ao profissional no backend.
  
 ---
  

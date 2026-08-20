@@ -11,7 +11,9 @@
 //              - Senha
 //
 //            Rede Privada:
-//              - Instituição (hospital/clínica)
+//              - Instituição (hospital/clínica) — OBRIGATÓRIA e
+//                validada no backend contra a unidade de saúde
+//                vinculada ao profissional (professional_health_units)
 //              - Email profissional
 //              - Registro Profissional (CRM ou COREN)
 //              - Senha
@@ -27,7 +29,7 @@
 //     password: string,
 //     professionalRegistry: string,  // CRM ou COREN
 //     networkType: 'public' | 'private',
-//     institution?: string,          // Apenas se networkType === 'private'
+//     institution?: string,          // Obrigatório se networkType === 'private'
 //   }
 //
 //   Resposta esperada do backend:
@@ -147,7 +149,9 @@ export default function LoginProfessionalScreen() {
 
   /**
    * Instituição de atuação — enviada como `institution`.
-   * Visível e obrigatória somente na Rede Privada.
+   * Visível e OBRIGATÓRIA somente na Rede Privada. O backend confere
+   * este valor contra a unidade de saúde vinculada ao profissional
+   * (ligação feita no cadastro, tabela professional_health_units).
    *
    * TODO: No futuro, substituir este TextInput por um componente
    *       de busca de hospitais/clínicas (ex: SearchInput com
@@ -178,6 +182,14 @@ export default function LoginProfessionalScreen() {
       return;
     }
 
+    // Na Rede Privada, a instituição é obrigatória: é ela que o
+    // backend usa para conferir se o profissional está mesmo
+    // vinculado àquele estabelecimento.
+    if (isPrivate && !institution.trim()) {
+      Alert.alert('Instituição obrigatória', 'Informe a instituição vinculada ao seu cadastro na Rede Privada.');
+      return;
+    }
+
     setLoading(true);
     try {
       await loginProfessional({
@@ -185,7 +197,7 @@ export default function LoginProfessionalScreen() {
         password,
         professionalRegistry,
         networkType,
-        ...(isPrivate && institution ? { institution } : {}),
+        ...(isPrivate ? { institution: institution.trim() } : {}),
       });
       router.replace({
         pathname: '/(professional)/home',
@@ -280,7 +292,9 @@ export default function LoginProfessionalScreen() {
         >
 
           {/*
-           * Campo Instituição — exibido SOMENTE na Rede Privada.
+           * Campo Instituição — exibido e OBRIGATÓRIO SOMENTE na
+           * Rede Privada. O valor é conferido pelo backend contra a
+           * unidade de saúde vinculada ao profissional.
            *
            * TODO: No futuro, substituir por um componente de busca
            *       de estabelecimentos de saúde (SearchInput com
@@ -293,11 +307,11 @@ export default function LoginProfessionalScreen() {
               exiting={FadeOutDown.duration(250)}
             >
               <InputField
-                label="Instituição"
+                label="Instituição *"
                 value={institution}
                 onChangeText={setInstitution}
                 icon="business-outline"
-                placeholder="Hospital ou clínica"
+                placeholder="Ex: Clínica Vida Saúde"
                 autoCapitalize="words"
               />
             </Animated.View>
