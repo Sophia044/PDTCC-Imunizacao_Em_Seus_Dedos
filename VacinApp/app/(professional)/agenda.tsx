@@ -123,7 +123,7 @@ export default function ProfessionalAgendaScreen() {
           <View style={styles.headerTitleRow}>
             <Ionicons name="calendar-outline" size={26} color={Colors.PROFESSIONAL} style={{ marginRight: 8 }} />
             <View>
-              <Text style={styles.title}>Agenda de Agendamentos</Text>
+              <Text style={styles.title}>Agendamentos</Text>
               <Text style={styles.subtitle}>Consultas e vacinações da Rede Privada</Text>
             </View>
             {loading && <ActivityIndicator size="small" color={Colors.PROFESSIONAL} style={{ marginLeft: 'auto' }} />}
