@@ -14,6 +14,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  Image,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -151,7 +152,7 @@ export default function WelcomeScreen() {
           {/* Logo — ícone branco + nome do app */}
           <Animated.View entering={FadeInDown.delay(80).duration(500)} style={styles.logoRow}>
             <View style={styles.logoCircle}>
-              <Ionicons name="medical" size={22} color={Colors.PRIMARY} />
+            <Image source={require('../../assets/logo.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
             </View>
             <Text style={styles.logoName}>VacinApp</Text>
           </Animated.View>

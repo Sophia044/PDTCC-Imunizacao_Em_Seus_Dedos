@@ -11,7 +11,7 @@
 import React, { useEffect } from 'react';
 
 // --- Componentes de layout do React Native ---
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, StyleSheet, Text, View } from 'react-native';
 
 // --- Gradiente linear para o fundo da splash ---
 import { LinearGradient } from 'expo-linear-gradient';
@@ -111,7 +111,7 @@ export default function SplashScreen() {
       <Animated.View style={[styles.logoWrap, logoStyle]}>
         {/* Círculo branco com ícone de cruz médica */}
         <View style={styles.iconCircle}>
-          <Ionicons name="medical" size={52} color={Colors.PRIMARY} />
+        <Image source={require('../assets/logo.png')} style={{ width: 64, height: 64 }} resizeMode="contain" />
         </View>
         {/* Nome do aplicativo */}
         <Text style={styles.appName}>VacinApp</Text>

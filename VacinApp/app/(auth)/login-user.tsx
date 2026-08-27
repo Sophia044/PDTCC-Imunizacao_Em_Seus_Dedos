@@ -22,7 +22,7 @@
 
 import React, { useState } from 'react';
 import {
-  Alert, KeyboardAvoidingView, Platform, ScrollView,
+  Alert, Image, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, Layout } from 'react-native-reanimated';
@@ -138,7 +138,7 @@ export default function LoginUserScreen() {
         {/* ---- LOGO ---- */}
         <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.logoRow}>
           <View style={styles.logoCircle}>
-            <Ionicons name="medical" size={28} color={Colors.NEUTRAL.WHITE} />
+          <Image source={require('../../assets/logo.png')} style={{ width: 34, height: 34 }} resizeMode="contain" />
           </View>
           <Text style={styles.logoText}>VacinApp</Text>
         </Animated.View>

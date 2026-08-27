@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -67,7 +68,7 @@ export default function LoginUnitScreen() {
 
         <Animated.View entering={FadeInDown.delay(80).duration(500)} style={styles.logoRow}>
           <View style={styles.logoCircle}>
-            <Ionicons name="business" size={26} color={Colors.NEUTRAL.WHITE} />
+          <Image source={require('../../assets/logo.png')} style={{ width: 32, height: 32 }} resizeMode="contain" />
           </View>
           <Text style={styles.logoText}>VacinApp</Text>
         </Animated.View>

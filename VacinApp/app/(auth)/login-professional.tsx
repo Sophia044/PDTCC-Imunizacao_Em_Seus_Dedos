@@ -45,6 +45,7 @@ import React, { useState } from 'react';
 // --- Componentes de layout e interação do React Native ---
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -222,7 +223,7 @@ export default function LoginProfessionalScreen() {
         {/* ---- LOGO: ícone + nome do app ---- */}
         <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.logoRow}>
           <View style={styles.logoCircle}>
-            <Ionicons name="medical" size={28} color={Colors.NEUTRAL.WHITE} />
+          <Image source={require('../../assets/logo.png')} style={{ width: 34, height: 34 }} resizeMode="contain" />
           </View>
           <Text style={styles.logoText}>VacinApp</Text>
         </Animated.View>

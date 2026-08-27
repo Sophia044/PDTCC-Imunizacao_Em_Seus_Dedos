@@ -8,7 +8,7 @@
 
 import React from 'react';
 import {
-  ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ScrollView, StyleSheet, Text, Image, TouchableOpacity, View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { router } from 'expo-router';
@@ -79,7 +79,7 @@ export default function ChooseRegistrationScreen() {
         {/* ---- LOGO INLINE ---- */}
         <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.logoRow}>
           <View style={styles.logoCircle}>
-            <Ionicons name="medical" size={22} color={Colors.NEUTRAL.WHITE} />
+          <Image source={require('../../assets/logo.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
           </View>
           <Text style={styles.logoText}>VacinApp</Text>
         </Animated.View>
