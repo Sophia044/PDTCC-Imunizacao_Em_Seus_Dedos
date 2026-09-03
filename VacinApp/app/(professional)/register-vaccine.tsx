@@ -443,8 +443,50 @@ export default function RegisterVaccineScreen() {
       return;
     }
 
-    if (!vaccine || !date) {
-      Alert.alert('Campos obrigatórios', 'Selecione a vacina e informe a data de aplicação.');
+    // Validar campos obrigatórios: vacina, dose, lote e data
+    if (!vaccine) {
+      Alert.alert('Campo obrigatório', 'Selecione a vacina administrada.');
+      return;
+    }
+    if (!dose.trim()) {
+      Alert.alert('Campo obrigatório', 'Informe a dose aplicada (ex: 1ª Dose, 2ª Dose, Reforço).');
+      return;
+    }
+    if (!lot.trim()) {
+      Alert.alert('Campo obrigatório', 'Informe o número de lote da vacina.');
+      return;
+    }
+    if (!date) {
+      Alert.alert('Campo obrigatório', 'Informe a data de aplicação.');
+      return;
+    }
+
+    // Validar formato e valor da data (não pode ser futura, nem inválida)
+    const parts = date.split('/');
+    if (parts.length !== 3 || parts[0].length !== 2 || parts[1].length !== 2 || parts[2].length !== 4) {
+      Alert.alert('Data inválida', 'Informe a data no formato DD/MM/AAAA.');
+      return;
+    }
+    const [day, month, year] = parts.map(Number);
+    const applicationDate = new Date(year, month - 1, day);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // fim do dia de hoje
+
+    // Verificar se a data é real (ex: 31/02 seria inválida)
+    if (
+      applicationDate.getFullYear() !== year ||
+      applicationDate.getMonth() !== month - 1 ||
+      applicationDate.getDate() !== day
+    ) {
+      Alert.alert('Data inválida', 'A data informada não existe. Verifique o dia, mês e ano.');
+      return;
+    }
+    if (year < 1900) {
+      Alert.alert('Data inválida', 'O ano deve ser a partir de 1900.');
+      return;
+    }
+    if (applicationDate > today) {
+      Alert.alert('Data inválida', 'Não é possível registrar uma vacinação com data futura. Use a data de hoje ou anterior.');
       return;
     }
 
@@ -542,30 +584,56 @@ export default function RegisterVaccineScreen() {
                   <Text style={styles.emptyQueueText}>A recepção ainda não encaminhou pacientes para vacinação.</Text>
                 </View>
               ) : (
-                publicQueue.map((item, i) => (
+                publicQueue.map((item, i) => {
+                  const overdue  = item.patient.overdueVaccines  ?? [];
+                  const pending  = item.patient.pendingVaccines  ?? [];
+                  const hasVaccines = overdue.length > 0 || pending.length > 0;
+                  return (
                   <Animated.View key={item.id} entering={FadeInDown.delay(120 + i * 55).duration(350)} style={styles.queueItem}>
-                    <View style={styles.queuePosition}>
-                      <Text style={styles.queuePositionText}>{item.position}</Text>
+                    {/* Linha superior: posição + info + botão */}
+                    <View style={styles.queueItemTop}>
+                      <View style={styles.queuePosition}>
+                        <Text style={styles.queuePositionText}>{item.position}</Text>
+                      </View>
+                      <View style={styles.queuePatientInfo}>
+                        <Text style={styles.queuePatientName} numberOfLines={1}>{item.patient.name}</Text>
+                        <Text style={styles.queuePatientMeta}>
+                          {item.arrivalTime} · {item.reason} · {item.patient.age} anos
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.startCareBtn}
+                        onPress={() => handleStartQueuedPatient(item)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="play" size={14} color={Colors.NEUTRAL.WHITE} />
+                        <Text style={styles.startCareText}>Iniciar</Text>
+                      </TouchableOpacity>
                     </View>
-                    <View style={styles.queuePatientInfo}>
-                      <Text style={styles.queuePatientName} numberOfLines={1}>{item.patient.name}</Text>
-                      <Text style={styles.queuePatientMeta}>
-                        {item.arrivalTime} · {item.reason} · {item.patient.age} anos
-                      </Text>
-                      {item.patient.pendingCount > 0 && (
-                        <Text style={styles.queuePending}>{item.patient.pendingCount} pendência(s) no calendário</Text>
-                      )}
-                    </View>
-                    <TouchableOpacity
-                      style={styles.startCareBtn}
-                      onPress={() => handleStartQueuedPatient(item)}
-                      activeOpacity={0.85}
-                    >
-                      <Ionicons name="play" size={14} color={Colors.NEUTRAL.WHITE} />
-                      <Text style={styles.startCareText}>Iniciar</Text>
-                    </TouchableOpacity>
+
+                    {/* Linha inferior: chips de vacinas pendentes/atrasadas */}
+                    {hasVaccines && (
+                      <View style={styles.queueVaccineChips}>
+                        {overdue.map(v => (
+                          <View key={v} style={styles.vaccineChipOverdue}>
+                            <Ionicons name="alert-circle" size={11} color={Colors.STATUS.OVERDUE} />
+                            <Text style={styles.vaccineChipTextOverdue} numberOfLines={1}>{v}</Text>
+                          </View>
+                        ))}
+                        {pending.map(v => (
+                          <View key={v} style={styles.vaccineChipPending}>
+                            <Ionicons name="time-outline" size={11} color={Colors.STATUS.PENDING} />
+                            <Text style={styles.vaccineChipTextPending} numberOfLines={1}>{v}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                    {!hasVaccines && (
+                      <Text style={styles.queueNoVaccines}>Nenhuma pendência registrada</Text>
+                    )}
                   </Animated.View>
-                ))
+                  );
+                })
               )}
             </Animated.View>
           )}
@@ -702,7 +770,7 @@ export default function RegisterVaccineScreen() {
             />
 
             <InputField
-              label="Dose"
+              label="Dose *"
               value={dose}
               onChangeText={setDose}
               icon="layers-outline"
@@ -739,7 +807,7 @@ export default function RegisterVaccineScreen() {
               placeholder="DD/MM/AAAA"
             />
             <InputField
-              label="Nº de Lote"
+              label="Nº de Lote *"
               value={lot}
               onChangeText={setLot}
               icon="barcode-outline"
@@ -870,13 +938,17 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   queueItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    flexDirection: 'column',
+    gap: 8,
     backgroundColor: Colors.CARD_BG,
     borderRadius: 14,
     padding: 12,
     marginBottom: 8,
+  },
+  queueItemTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   queuePosition: {
     width: 38,
@@ -906,11 +978,56 @@ const styles = StyleSheet.create({
     color: Colors.NEUTRAL.MUTED,
     marginTop: 2,
   },
-  queuePending: {
+  // Chips de vacinas pendentes/atrasadas
+  queueVaccineChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    paddingTop: 2,
+    borderTopWidth: 1,
+    borderTopColor: Colors.BORDER,
+  },
+  vaccineChipOverdue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FDF0F0',
+    borderWidth: 1,
+    borderColor: '#F0C0BE',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  vaccineChipTextOverdue: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.STATUS.OVERDUE,
+    maxWidth: 160,
+  },
+  vaccineChipPending: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF8EC',
+    borderWidth: 1,
+    borderColor: '#F5D98A',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  vaccineChipTextPending: {
     fontSize: 11,
     fontWeight: '700',
     color: Colors.STATUS.PENDING,
-    marginTop: 3,
+    maxWidth: 160,
+  },
+  queueNoVaccines: {
+    fontSize: 11,
+    color: Colors.NEUTRAL.MUTED,
+    fontStyle: 'italic',
+    paddingTop: 2,
+    borderTopWidth: 1,
+    borderTopColor: Colors.BORDER,
   },
   startCareBtn: {
     flexDirection: 'row',
