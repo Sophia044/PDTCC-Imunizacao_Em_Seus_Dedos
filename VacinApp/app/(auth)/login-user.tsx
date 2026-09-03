@@ -138,7 +138,7 @@ export default function LoginUserScreen() {
         {/* ---- LOGO ---- */}
         <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.logoRow}>
           <View style={styles.logoCircle}>
-          <Image source={require('../../assets/logo.png')} style={{ width: 34, height: 34 }} resizeMode="contain" />
+          <Image source={require('../../assets/logo.png')} style={{ width: 38, height: 38 }} resizeMode="contain" />
           </View>
           <Text style={styles.logoText}>VacinApp</Text>
         </Animated.View>
