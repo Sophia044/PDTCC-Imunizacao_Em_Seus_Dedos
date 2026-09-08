@@ -48,9 +48,12 @@ Muitas pessoas não sabem quais vacinas já tomaram, quando tomar a próxima dos
 - **Autenticação:** [python-jose](https://github.com/mpdavis/python-jose) (JWT) e [bcrypt](https://pypi.org/project/bcrypt/)
 - **Cliente HTTP Assíncrono:** [httpx](https://www.python-httpx.org/) (comunicação de alta performance com a IA)
 
-### 🧠 Inteligência Artificial (Local & Privativa)
+### 🧠 Inteligência Artificial (Local, Privativa & RAG)
 - **Motor de Execução:** [Ollama](https://ollama.com/)
-- **Modelo:** `qwen2.5:14b` (Qwen 2.5 otimizado para raciocínio e linguagem natural em português)
+- **Modelo de Linguagem (LLM):** `qwen2.5:14b` (Qwen 2.5 otimizado para raciocínio e linguagem natural em português)
+- **Modelo de Embeddings:** `nomic-embed-text` (768 dimensões para busca semântica em documentos)
+- **Banco Vetorial:** [ChromaDB](https://www.trychroma.com/) (persistência local com métrica angular de cosseno)
+- **Documentos Oficiais (RAG):** Manuais e calendários do Ministério da Saúde e SBIm
 - **Conectividade Remota:** Suporte a rede mesh [Tailscale](https://tailscale.com/) para acesso remoto sem expor portas públicas.
 
 ---
@@ -175,14 +178,23 @@ Antes de iniciar, garanta que seu computador possui os seguintes softwares insta
 
 ## 🚀 Como Iniciar o Projeto Passo a Passo
 
-### 1️⃣ Inicializar o Motor de IA (Ollama)
-No seu computador, certifique-se de que o modelo `qwen2.5:14b` está baixado e ativo:
+### 1️⃣ Inicializar o Motor de IA (Ollama) e Preparar o RAG
+1. No seu computador, certifique-se de que os modelos estão baixados no Ollama:
+   ```powershell
+   # Modelo de resposta (LLM)
+   ollama run qwen2.5:14b
 
-```powershell
-# Baixar e testar o modelo
-ollama run qwen2.5:14b
-```
-> O Ollama ficará escutando por padrão em `http://localhost:11434`.
+   # Modelo de busca semântica em documentos (Embeddings)
+   ollama pull nomic-embed-text
+   ```
+   > O Ollama ficará escutando por padrão em `http://localhost:11434`.
+
+2. *(Opcional)* Se adicionou novos PDFs na pasta `backend/documentos-vacinacao/`, indexe a base vetorial:
+   ```powershell
+   cd backend
+   .\venv\Scripts\activate
+   python index_documents.py
+   ```
 
 ---
 

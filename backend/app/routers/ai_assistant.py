@@ -1,19 +1,30 @@
 # ============================================================
-# ROUTER: Assistente Virtual com IA Local (Ollama)
+# ROUTER: Assistente Virtual com IA Local e RAG (Ollama + ChromaDB)
 #
-# Este módulo expõe um único endpoint POST /ai/ask que:
-#   1. Recebe a pergunta do paciente autenticado
-#   2. Monta o prompt e envia para o Ollama rodando localmente
-#   3. Retorna a resposta da IA para o app
+# Este módulo expõe o endpoint POST /ai/ask que:
+#   1. Recebe a pergunta do paciente autenticado.
+#   2. Consulta a base vetorial local (ChromaDB) para buscar trechos
+#      de documentos oficiais (Ministério da Saúde / SBIm).
+#   3. Aplica o LIMIAR DE SIMILARIDADE para decidir a rota:
+#      - SE encontrou trechos oficiais relevantes:
+#          Injeta os chunks no prompt e instrui a IA a responder
+#          estritamente com base nesses dados, citando as fontes oficiais.
+#          Retorna 'baseado_em_documentos: true'.
+#      - SE NÃO encontrou trechos suficientes:
+#          Instrui a IA a responder apenas com conhecimento geral,
+#          SEM INVENTAR datas, doses ou nomes específicos, alertando
+#          claramente o usuário e recomendando um profissional de saúde.
+#          Retorna 'baseado_em_documentos: false'.
+#   4. Envia o prompt final para o modelo Qwen (qwen2.5:14b) via Ollama.
+#   5. Retorna a resposta com o texto gerado e a indicação de procedência.
 #
-# A comunicação com o Ollama usa httpx (cliente HTTP assíncrono)
-# para não bloquear o servidor FastAPI enquanto a IA processa.
-#
-# Para funcionar, o Ollama precisa estar rodando e o modelo
-# configurado deve estar instalado:
-#   ollama run qwen2.5:14b
+# PONTO FUNDAMENTAL PARA O TCC:
+# Esta arquitetura RAG condicional garante o princípio da "IA Responsável em Saúde":
+# impede alucinações em dados sensíveis e dá total transparência ao paciente
+# sobre a procedência da orientação recebida.
 # ============================================================
 
+from typing import List
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -21,13 +32,13 @@ from pydantic import BaseModel
 from app.config import settings
 from app.deps import current_patient
 from app import models
+from app.services.rag_service import rag_service
 
 # Prefixo /ai agrupa todos os endpoints de inteligência artificial
 router = APIRouter(prefix="/ai", tags=["Assistente Virtual"])
 
-# Timeout generoso: modelos de linguagem podem demorar alguns segundos
-# para processar uma resposta complexa, especialmente na primeira chamada
-OLLAMA_TIMEOUT_SECONDS = 60.0
+# Timeout para geração de texto: modelos de 14B podem demorar alguns segundos
+OLLAMA_TIMEOUT_SECONDS = 90.0
 
 
 # -------------------------------------------------------
@@ -40,8 +51,10 @@ class AskRequest(BaseModel):
 
 
 class AskResponse(BaseModel):
-    """Resposta retornada ao app com o texto gerado pela IA."""
-    answer: str  # Texto da resposta gerada pelo modelo
+    """Resposta retornada ao app com o texto gerado pela IA e metadados RAG."""
+    answer: str                          # Texto da resposta gerada pelo modelo
+    baseado_em_documentos: bool = False  # True se embasada nos PDFs oficiais
+    fontes: List[str] = []               # Documentos oficiais consultados
 
 
 # -------------------------------------------------------
@@ -55,39 +68,66 @@ async def ask_ai(
     _patient: models.Patient = Depends(current_patient),
 ) -> AskResponse:
     """
-    Recebe uma pergunta sobre vacinação e retorna a resposta da IA.
-
-    O backend atua como intermediário entre o app e o Ollama:
-    o app nunca se comunica diretamente com o Ollama (que só
-    está acessível internamente via localhost).
+    Recebe uma pergunta sobre vacinação, pesquisa documentos oficiais via RAG
+    e gera uma resposta segura e fundamentada com o modelo local.
     """
+    question_clean = body.question.strip()
+    if not question_clean:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A pergunta não pode estar vazia."
+        )
 
     # -------------------------------------------------------
-    # Monta o prompt com contexto de domínio
-    # Orientar o modelo a responder especificamente sobre
-    # vacinação melhora a qualidade e a relevância da resposta.
+    # ETAPA 1: Busca Semântica no ChromaDB (RAG)
     # -------------------------------------------------------
-    system_context = (
-        "Você é um assistente de saúde especializado em vacinação, "
-        "fazendo parte do aplicativo VacinApp. "
-        "Responda de forma clara, amigável e em português brasileiro. "
-        "Foque em informações sobre vacinas, calendário vacinal, "
-        "efeitos colaterais e orientações gerais de imunização. "
-        "Se a pergunta não for sobre saúde ou vacinação, oriente o "
-        "usuário a procurar um profissional de saúde ou a reformular "
-        "a pergunta dentro do contexto do aplicativo."
-    )
+    rag_result = await rag_service.query_relevant_documents(question_clean)
 
-    # Payload no formato esperado pela API do Ollama
-    # Referência: https://github.com/ollama/ollama/blob/main/docs/api.md
+    # -------------------------------------------------------
+    # ETAPA 2: Decisão Condicional do Prompt (Engenharia de Prompt Segura)
+    # -------------------------------------------------------
+    if rag_result.baseado_em_documentos:
+        # ROTA 1: Resposta embasada em documentos oficiais do Ministério da Saúde / SBIm
+        context_chunks_formatted = "\n\n".join(
+            f"--- Trecho do documento: {chunk.source_file}"
+            + (f" (Página {chunk.page})" if chunk.page else "")
+            + f" ---\n{chunk.content}"
+            for chunk in rag_result.chunks
+        )
+
+        final_prompt = (
+            "Você é um assistente de saúde especializado em vacinação, parte do aplicativo VacinApp.\n"
+            "Use ESTRITAMENTE as informações abaixo, extraídas de documentos oficiais de vacinação "
+            "(Ministério da Saúde / SBIm), para responder de forma clara, amigável e acolhedora em português brasileiro.\n"
+            "Diretrizes importantes:\n"
+            "1. Não acrescente dados específicos (como datas ou dosagens) que não estejam presentes nos trechos abaixo.\n"
+            "2. Ao final da resposta, cite explicitamente que a informação foi obtida a partir dos documentos oficiais consultados (Ministério da Saúde / SBIm).\n\n"
+            f"Informações dos documentos oficiais:\n{context_chunks_formatted}\n\n"
+            f"Pergunta do usuário: {question_clean}"
+        )
+    else:
+        # ROTA 2: Ausência de trechos oficiais que superem o limiar de similaridade
+        # Não alucinar dados específicos (datas, doses, marcas de vacina)
+        final_prompt = (
+            "Você é um assistente de saúde especializado em vacinação, parte do aplicativo VacinApp.\n"
+            "Não há informação sobre esta pergunta específica nos documentos oficiais disponíveis no sistema.\n"
+            "Responda com seu conhecimento geral sobre o assunto em português brasileiro, seguindo com rigor estas regras:\n"
+            "1. NUNCA invente dados específicos como datas precisas, números de doses ou nomes comerciais de produtos que você não tenha absoluta certeza.\n"
+            "2. Dê apenas orientações gerais e educativas de saúde.\n"
+            "3. Deixe claro ao usuário, de forma natural e empática, que esta resposta é baseada em conhecimento geral de saúde e não nos documentos oficiais atualizados da nossa base.\n"
+            "4. Sempre recomende ao paciente que confirme a informação em uma Unidade Básica de Saúde (UBS), posto de vacinação ou com um profissional de saúde habilitado.\n\n"
+            f"Pergunta do usuário: {question_clean}"
+        )
+
+    # Payload formatado para a API do Ollama (/api/generate)
     ollama_payload = {
-        "model": settings.ollama_model,    # Modelo configurado no .env (padrão: qwen2.5:14b)
-        "prompt": f"{system_context}\n\nPergunta do usuário: {body.question}",
-        "stream": False,                   # False = aguarda a resposta completa antes de retornar
+        "model": settings.ollama_model,
+        "prompt": final_prompt,
+        "stream": False,
     }
 
     # -------------------------------------------------------
-    # Chama o Ollama via HTTP usando httpx assíncrono
+    # ETAPA 3: Envio ao Modelo de IA Local (qwen2.5:14b)
     # -------------------------------------------------------
     try:
         async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT_SECONDS) as client:
@@ -95,32 +135,28 @@ async def ask_ai(
                 f"{settings.ollama_url}/api/generate",
                 json=ollama_payload,
             )
-            response.raise_for_status()  # Lança erro se o Ollama retornar HTTP 4xx/5xx
+            response.raise_for_status()
 
     except httpx.ConnectError:
-        # Ollama não está rodando ou a URL está errada
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="O assistente virtual está temporariamente indisponível. Tente novamente mais tarde.",
+            detail="O assistente virtual está temporariamente indisponível. Certifique-se de que o Ollama está em execução.",
         )
 
     except httpx.TimeoutException:
-        # O modelo demorou mais que o timeout configurado
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="A resposta demorou muito para chegar. Tente uma pergunta mais curta ou tente novamente.",
+            detail="O modelo demorou muito para responder. Tente uma pergunta mais curta ou tente novamente.",
         )
 
     except httpx.HTTPStatusError as exc:
-        # O Ollama retornou um erro HTTP (ex: modelo não instalado)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Erro interno do assistente: {exc.response.status_code}. Verifique se o modelo está instalado.",
+            detail=f"Erro interno do assistente ({exc.response.status_code}). Verifique se o modelo está instalado no Ollama.",
         )
 
     # -------------------------------------------------------
-    # Extrai a resposta do JSON retornado pelo Ollama
-    # O campo "response" contém o texto gerado pelo modelo
+    # ETAPA 4: Formatação da Resposta Final
     # -------------------------------------------------------
     data = response.json()
     answer_text = data.get("response", "").strip()
@@ -128,7 +164,11 @@ async def ask_ai(
     if not answer_text:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="O assistente não retornou uma resposta. Tente novamente.",
+            detail="O assistente não retornou uma resposta válida. Tente novamente.",
         )
 
-    return AskResponse(answer=answer_text)
+    return AskResponse(
+        answer=answer_text,
+        baseado_em_documentos=rag_result.baseado_em_documentos,
+        fontes=rag_result.fontes,
+    )

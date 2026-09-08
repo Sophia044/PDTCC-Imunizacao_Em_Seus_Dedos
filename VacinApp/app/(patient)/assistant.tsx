@@ -57,6 +57,8 @@ type Message = {
   id: number;          // Identificador único da mensagem
   role: 'user' | 'ai'; // Quem enviou a mensagem
   text: string;        // Conteúdo da mensagem
+  baseadoEmDocumentos?: boolean; // Se a resposta usou documentos oficiais
+  fontes?: string[];             // Documentos oficiais consultados
 };
 
 // Sugestões de perguntas exibidas ao abrir a tela pela primeira vez
@@ -89,9 +91,22 @@ export default function AssistantScreen() {
   // -------------------------------------------------------
   // Função para adicionar uma nova mensagem ao histórico
   // -------------------------------------------------------
-  function addMessage(role: 'user' | 'ai', text: string) {
+  function addMessage(
+    role: 'user' | 'ai',
+    text: string,
+    meta?: { baseadoEmDocumentos?: boolean; fontes?: string[] }
+  ) {
     messageIdRef.current += 1;
-    setMessages(prev => [...prev, { id: messageIdRef.current, role, text }]);
+    setMessages(prev => [
+      ...prev,
+      {
+        id: messageIdRef.current,
+        role,
+        text,
+        baseadoEmDocumentos: meta?.baseadoEmDocumentos,
+        fontes: meta?.fontes,
+      },
+    ]);
     // Aguarda o re-render e rola o scroll para o final
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
   }
@@ -111,9 +126,12 @@ export default function AssistantScreen() {
 
     try {
       // Chama o serviço de IA — faz POST /ai/ask no backend,
-      // que encaminha para o Ollama e retorna a resposta
-      const answer = await askAI(text);
-      addMessage('ai', answer);
+      // que executa RAG no ChromaDB e chama o Ollama
+      const response = await askAI(text);
+      addMessage('ai', response.answer, {
+        baseadoEmDocumentos: response.baseado_em_documentos,
+        fontes: response.fontes,
+      });
 
     } catch (error) {
       // Trata erros de rede ou respostas de erro do backend
@@ -213,6 +231,29 @@ export default function AssistantScreen() {
                 styles.bubbleContent,
                 msg.role === 'user' ? styles.userBubbleContent : styles.aiBubbleContent,
               ]}>
+                {/* Selo visual de procedência RAG (Documentos Oficiais vs Conhecimento Geral) */}
+                {msg.role === 'ai' && msg.baseadoEmDocumentos !== undefined && (
+                  <View style={[
+                    styles.ragBadge,
+                    msg.baseadoEmDocumentos ? styles.ragBadgeDoc : styles.ragBadgeGeneral
+                  ]}>
+                    <Ionicons
+                      name={msg.baseadoEmDocumentos ? "shield-checkmark" : "information-circle-outline"}
+                      size={13}
+                      color={msg.baseadoEmDocumentos ? "#2E7D32" : "#E65100"}
+                    />
+                    <Text style={[
+                      styles.ragBadgeText,
+                      msg.baseadoEmDocumentos ? styles.ragBadgeTextDoc : styles.ragBadgeTextGeneral
+                    ]}>
+                      {msg.baseadoEmDocumentos
+                        ? (msg.fontes && msg.fontes.length > 0
+                            ? `Oficial: ${msg.fontes.join(', ')}`
+                            : 'Documentos Oficiais (MS/SBIm)')
+                        : 'Orientação Geral (sem docs específicos)'}
+                    </Text>
+                  </View>
+                )}
                 <Text style={[
                   styles.bubbleText,
                   msg.role === 'user' ? styles.userBubbleText : styles.aiBubbleText,
@@ -229,9 +270,9 @@ export default function AssistantScreen() {
               <View style={styles.aiAvatar}>
                 <Ionicons name="chatbubble-ellipses" size={14} color={Colors.NEUTRAL.WHITE} />
               </View>
-              <View style={styles.aiBubbleContent}>
+              <View style={[styles.bubbleContent, styles.aiBubbleContent, styles.loadingBubbleContent]}>
                 <ActivityIndicator size="small" color={Colors.PRIMARY} />
-                <Text style={styles.loadingText}>Gerando resposta...</Text>
+                <Text style={styles.loadingText}>Pesquisando documentos e gerando resposta...</Text>
               </View>
             </Animated.View>
           )}
@@ -380,14 +421,48 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
+  },
+  loadingBubbleContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
 
+  // === SELOS VISUAIS RAG (Origem da informação) ===
+  ragBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 6,
+    alignSelf: 'flex-start',
+  },
+  ragBadgeDoc: {
+    backgroundColor: '#E8F5E9', // Verde suave para documentos oficiais
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+  },
+  ragBadgeGeneral: {
+    backgroundColor: '#FFF3E0', // Laranja suave para conhecimento geral
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+  },
+  ragBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  ragBadgeTextDoc: {
+    color: '#2E7D32',
+  },
+  ragBadgeTextGeneral: {
+    color: '#E65100',
+  },
+
   bubbleText: { fontSize: 14, lineHeight: 20 },
   userBubbleText: { color: Colors.NEUTRAL.WHITE },
-  aiBubbleText: { color: Colors.NEUTRAL.DARK_TEXT, flex: 1 },
+  aiBubbleText: { color: Colors.NEUTRAL.DARK_TEXT },
 
   // === INDICADOR DE CARREGAMENTO ===
   loadingBubble: {

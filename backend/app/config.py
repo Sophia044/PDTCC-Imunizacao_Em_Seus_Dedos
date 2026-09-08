@@ -43,6 +43,20 @@ class Settings(BaseSettings):
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:14b"
 
+    # --- Sistema RAG (Retrieval-Augmented Generation) ---
+    # Parâmetros para indexação e recuperação de documentos oficiais de vacinação
+    rag_docs_dir: str = "documentos-vacinacao"
+    rag_chroma_dir: str = "chroma_db"
+    rag_collection_name: str = "vacinacao_docs"
+    rag_embedding_model: str = "nomic-embed-text"
+    rag_top_k: int = 4  # Quantidade de chunks mais similares recuperados
+    # Limiar mínimo de similaridade de cosseno (0.0 a 1.0).
+    # Com base em validação empírica com o nomic-embed-text:
+    # - Perguntas fora do tema ou não cobertas ficam entre 0.55 e 0.60
+    # - Perguntas pertinentes com correspondência oficial atingem > 0.70
+    # Portanto, 0.65 garante uma separação ideal entre documentos oficiais e conhecimento geral.
+    rag_similarity_threshold: float = 0.65
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

@@ -10,3 +10,6 @@ PyMySQL==1.1.1
 python-multipart==0.0.20
 email-validator==2.2.0
 httpx==0.28.1         # Cliente HTTP assíncrono — usado para comunicação com o Ollama
+chromadb>=0.5.0       # Banco de dados vetorial para RAG
+pypdf>=4.0.0          # Extração de texto e páginas de PDFs oficiais
+fonttools>=4.0.0      # Suporte a fontes CFF/Type1 em PDFs complexos

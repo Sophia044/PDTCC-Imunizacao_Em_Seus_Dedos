@@ -1,0 +1,2 @@
+# Coloque seus arquivos PDF oficiais de vacinação (Ministério da Saúde, SBIm, PNI) nesta pasta.
+# Depois, execute: python index_documents.py (dentro da pasta backend, com o ambiente virtual ativado).

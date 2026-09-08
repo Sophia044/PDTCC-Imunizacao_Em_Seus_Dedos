@@ -121,15 +121,47 @@ backend/
 └── .env.example
 ```
 
-## 🤖 Integração com IA (Ollama)
+## 🤖 Integração com IA e RAG (Ollama + ChromaDB)
 
-O backend atua como proxy seguro e especialista para o modelo de linguagem local (`qwen2.5:14b`).
-As configurações podem ser ajustadas no arquivo `.env`:
+O backend atua como proxy seguro e especialista para o modelo de linguagem local (`qwen2.5:14b`), com suporte a **RAG (Retrieval-Augmented Generation)** utilizando base vetorial persistente no **ChromaDB** e o modelo de embeddings **`nomic-embed-text`**.
 
+### ⚙️ Configurações no `.env`:
 ```env
 OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:14b
+
+# RAG (Opcional - valores padrão já configurados)
+# RAG_DOCS_DIR=documentos-vacinacao
+# RAG_CHROMA_DIR=chroma_db
+# RAG_EMBEDDING_MODEL=nomic-embed-text
+# RAG_TOP_K=4
+# RAG_SIMILARITY_THRESHOLD=0.55
 ```
+
+### 📚 Como Indexar Documentos Oficiais (Ministério da Saúde / SBIm):
+A atualização dos documentos é **100% manual**, conferindo controle total aos administradores da aplicação.
+
+1. **Pré-requisito:** Certifique-se de que o modelo de embeddings está baixado no Ollama:
+   ```powershell
+   ollama pull nomic-embed-text
+   ```
+
+2. **Inserir os PDFs:**
+   Coloque os arquivos PDF oficiais de vacinação (ex: notas técnicas, calendários SBIm/PNI) na pasta:
+   `backend/documentos-vacinacao/`
+
+3. **Executar o script de indexação:**
+   No terminal, dentro da pasta `backend` e com o venv ativo:
+   ```powershell
+   python index_documents.py
+   ```
+   *O script lê os PDFs, divide o texto em chunks de ~500 palavras (com 50 palavras de sobreposição para não perder contexto entre frases), gera os vetores no Ollama e persiste no diretório `backend/chroma_db/`.*
+
+### 🛡️ Lógica de IA Responsável em Saúde (Para a Banca do TCC):
+- **Limiar de Relevância (0.55):** Se os trechos mais próximos recuperados no ChromaDB tiverem similaridade de cosseno inferior a `0.55`, o sistema considera que os documentos oficiais disponíveis não cobrem a dúvida do paciente.
+- **Prevenção de Alucinações:** Nesses casos, o sistema aciona a **Rota de Conhecimento Geral**: orienta a IA a **NUNCA** inventar datas, doses ou nomes comerciais específicos, emitindo um alerta amigável ao usuário e recomendando buscar uma UBS ou profissional de saúde.
+- **Transparência:** O endpoint retorna o campo `"baseado_em_documentos": true/false`, permitindo que o aplicativo exiba visualmente a procedência da informação.
+
 
 ## Decisões de escopo (documentadas para manutenção futura)
 

@@ -1,9 +1,10 @@
 // ============================================================
-// API: Assistente Virtual (IA Local via Ollama)
+// API: Assistente Virtual (IA Local via Ollama + RAG)
 //
 // Este serviço encapsula a chamada ao endpoint POST /ai/ask
-// do backend, que por sua vez encaminha a pergunta para o
-// modelo de linguagem (Qwen2.5:14b) rodando localmente via Ollama.
+// do backend, que realiza a busca vetorial nos documentos oficiais
+// de vacinação (RAG) e encaminha a pergunta para o modelo de
+// linguagem (Qwen2.5:14b) rodando localmente via Ollama.
 //
 // Padrão idêntico ao dos outros serviços em services/api/:
 //   - Usa apiRequest() do client.ts (já trata token JWT e erros HTTP)
@@ -21,30 +22,31 @@ interface AskPayload {
   question: string; // Texto da pergunta do usuário
 }
 
-/** Resposta retornada pelo endpoint /ai/ask */
-interface AskApiResponse {
-  answer: string; // Texto gerado pelo modelo de IA
+/** Resposta retornada pelo endpoint /ai/ask com metadados RAG */
+export interface AskApiResponse {
+  answer: string;                  // Texto gerado pelo modelo de IA
+  baseado_em_documentos: boolean;  // True se a resposta é fundamentada nos PDFs oficiais
+  fontes: string[];                // Nomes dos arquivos consultados
 }
 
 // -------------------------------------------------------
-// Função principal: envia uma pergunta e retorna a resposta da IA
+// Função principal: envia uma pergunta e retorna a resposta da IA com metadados
 // -------------------------------------------------------
 
 /**
- * Envia uma pergunta ao Assistente Virtual e retorna o texto da resposta.
+ * Envia uma pergunta ao Assistente Virtual e retorna a resposta e sua procedência.
  *
  * @param question - Pergunta em linguagem natural sobre vacinação
- * @returns Texto da resposta gerada pelo modelo (Qwen2.5:14b)
+ * @returns Resposta com o texto gerado, se é baseado em documentos e fontes
  *
  * Exemplos de uso na tela:
- *   const resposta = await askAI('Quais vacinas preciso tomar com 30 anos?');
+ *   const { answer, baseado_em_documentos } = await askAI('Quais vacinas preciso tomar com 30 anos?');
  */
-export async function askAI(question: string): Promise<string> {
-  // apiRequest já cuida de: token JWT, serialização JSON, e mensagens de erro
+export async function askAI(question: string): Promise<AskApiResponse> {
   const response = await apiRequest<AskApiResponse>('/ai/ask', {
     method: 'POST',
     body: { question } satisfies AskPayload,
   });
 
-  return response.answer;
+  return response;
 }
