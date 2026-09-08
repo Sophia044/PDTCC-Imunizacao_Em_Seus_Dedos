@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     app_name: str = "VacinApp API"
     environment: str = "development"
 
+    # --- Integração com IA Local (Ollama) ---
+    # O backend roda no mesmo PC que o Ollama, então usamos localhost.
+    # Para mudar o modelo ou a URL (ex: em outro ambiente), defina no .env:
+    #   OLLAMA_URL=http://localhost:11434
+    #   OLLAMA_MODEL=qwen2.5:14b
+    ollama_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:14b"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

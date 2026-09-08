@@ -104,6 +104,7 @@ backend/
 │   ├── main.py                 # monta a aplicação e registra as rotas
 │   └── routers/
 │       ├── auth.py             # login e cadastro (paciente, profissional, unidade)
+│       ├── ai_assistant.py     # 🤖 assistente virtual com IA (proxy Ollama + system prompt)
 │       ├── patients.py          # perfil do paciente + busca/listagem pelo profissional
 │       ├── professionals.py      # perfil do profissional autenticado
 │       ├── vaccines.py             # catálogo de vacinas
@@ -118,6 +119,16 @@ backend/
 ├── seed.py                # dados de demonstração
 ├── requirements.txt
 └── .env.example
+```
+
+## 🤖 Integração com IA (Ollama)
+
+O backend atua como proxy seguro e especialista para o modelo de linguagem local (`qwen2.5:14b`).
+As configurações podem ser ajustadas no arquivo `.env`:
+
+```env
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:14b
 ```
 
 ## Decisões de escopo (documentadas para manutenção futura)
@@ -150,6 +161,7 @@ Veja a lista completa e testável em `/docs`. Resumo:
 | `POST /auth/professional/register` | público | cadastro de profissional |
 | `POST /auth/professional/login` | público | login do profissional |
 | `POST /auth/unit/login` | público | login da unidade (triagem) |
+| `POST /ai/ask` | autenticado | **🤖 pergunta ao assistente virtual de vacinação** |
 | `GET /patients/me` | paciente | próprio histórico vacinal |
 | `GET /patients`, `/patients/search`, `/patients/{id}` | profissional | listar/buscar/abrir paciente |
 | `GET /vaccines` | qualquer autenticado | catálogo de vacinas |

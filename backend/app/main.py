@@ -19,6 +19,7 @@ from app import models  # noqa: F401 - garante que os modelos sejam registrados 
 from app.config import settings
 from app.database import Base, engine
 from app.routers import (
+    ai_assistant,
     appointments,
     auth,
     campaigns,
@@ -61,6 +62,7 @@ app.include_router(health_units.router)
 app.include_router(queue.router)
 app.include_router(campaigns.router)
 app.include_router(stock.router)
+app.include_router(ai_assistant.router)  # Assistente Virtual — integração com Ollama
 
 
 @app.get("/", tags=["Status"])

@@ -1,367 +1,335 @@
 # 💉 VacinApp — Imunização em Seus Dedos
 
-Aplicativo mobile desenvolvido como Trabalho de Conclusão de Curso (TCC) da ETEC,
-com o objetivo de digitalizar e centralizar o histórico vacinal dos usuários.
+> **Aplicativo mobile para digitalização e centralização do histórico vacinal integrado com Inteligência Artificial Local (Ollama / Qwen 2.5).**  
+> Desenvolvido como Trabalho de Conclusão de Curso (TCC) da ETEC.
 
 ---
 
 ## 📋 Sobre o Projeto
 
-Muitas pessoas não sabem quais vacinas já tomaram ou onde está sua carteira de
-vacinação física. O VacinApp resolve esse problema oferecendo:
+Muitas pessoas não sabem quais vacinas já tomaram, quando tomar a próxima dose ou onde está sua carteira de vacinação física. O **VacinApp** resolve esse problema unificando o controle vacinal de pacientes e profissionais de saúde com tecnologia moderna, segura e inteligente.
 
-- 📱 Histórico vacinal digital sempre disponível no celular
-- 🗓️ Calendário de vacinação com alertas de doses pendentes e atrasadas
-- 🗺️ Mapa de postos de vacinação próximos (SUS e clínicas particulares)
-- 📰 Notícias e atualizações sobre vacinação e saúde
-- 👩‍⚕️ Painel exclusivo para profissionais de saúde registrarem vacinações
-
-O app funciona como **complemento** à carteira física — não como substituto.
+### ✨ Principais Recursos
+- 📱 **Histórico Vacinal Digital:** Carteira de vacinação sempre disponível no smartphone.
+- 🗓️ **Calendário Vacinal Inteligente:** Alertas de doses pendentes, atrasadas e próximas imunizações.
+- 🤖 **Assistente Virtual com IA Local:** Tira-dúvidas sobre vacinas, calendário do SUS (PNI), reações esperadas e contraindicações powered by **Qwen 2.5:14b via Ollama**.
+- 🗺️ **Mapa de Postos de Vacinação:** Localização de UBSs (SUS) e clínicas particulares próximas em tempo real.
+- 👥 **Triagem e Fila em Tempo Real:** Módulo para Unidades Básicas de Saúde organizarem a fila de espera.
+- 👩‍⚕️ **Painel Profissional:** Cadastro de aplicações, validação por lote e fabricante, e busca rápida de pacientes por CPF/CNS.
+- 📰 **Campanhas e Notícias:** Informações atualizadas sobre imunização e saúde pública.
 
 ---
 
 ## 👥 Perfis de Acesso
 
-| Perfil | Cor de Identidade | Funcionalidades |
+| Perfil | Cor de Identidade | Funcionalidades Principais |
 |---|---|---|
-| **Paciente** | Roxo (#685895) | Ver histórico, calendário, mapa, notícias e perfil |
-| **Profissional** | Verde (#588C5A) | Registrar vacinas, gerenciar pacientes, configurações |
-| **Unidade de Saúde** | Verde (#588C5A) | Triagem: identificar pacientes e organizar a fila de vacinação |
+| **Paciente** | Roxo (`#685895`) | Visualizar carteira de vacinação, calendário, mapa de postos, **Assistente IA de Imunização** e perfil. |
+| **Profissional** | Verde (`#588C5A`) | Registrar novas doses aplicadas, buscar histórico do paciente por CPF, gerenciar agenda (rede privada). |
+| **Unidade de Saúde** | Verde (`#588C5A`) | Fila de atendimento e triagem de pacientes em tempo real. |
 
 ---
 
 ## 🛠️ Tecnologias Utilizadas
 
-**Front-end (Mobile)**
-- [React Native](https://reactnative.dev/) com [Expo](https://expo.dev/)
-- [TypeScript](https://www.typescriptlang.org/) — tipagem estática
-- [Expo Router](https://expo.github.io/router) — navegação baseada em arquivos
-- [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/) — animações
-- [react-native-maps](https://github.com/react-native-maps/react-native-maps) — mapa interativo
-- [react-native-calendars](https://github.com/wix/react-native-calendars) — calendário
-- [@gorhom/bottom-sheet](https://gorhom.github.io/react-native-bottom-sheet/) — painel deslizante
-- [expo-linear-gradient](https://docs.expo.dev/versions/latest/sdk/linear-gradient/) — gradientes
-- [expo-location](https://docs.expo.dev/versions/latest/sdk/location/) — geolocalização (mapa de postos)
-- [@react-native-async-storage/async-storage](https://react-native-async-storage.github.io/async-storage/) — persistência da sessão (token de login)
-- React Context API (`contexts/AuthContext.tsx`) — estado global de autenticação
+### 📱 Frontend (Mobile)
+- **Framework:** [React Native](https://reactnative.dev/) com [Expo SDK 54](https://expo.dev/)
+- **Linguagem:** [TypeScript](https://www.typescriptlang.org/)
+- **Roteamento:** [Expo Router](https://docs.expo.dev/router/introduction/) (navegação baseada em arquivos)
+- **Animações & UI:** [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/), [Expo Linear Gradient](https://docs.expo.dev/versions/latest/sdk/linear-gradient/)
+- **Mapas & Calendários:** [react-native-maps](https://github.com/react-native-maps/react-native-maps), [react-native-calendars](https://github.com/wix/react-native-calendars)
+- **Armazenamento Seguro:** `@react-native-async-storage/async-storage` (persistência de JWT)
 
-**Back-end**
-- [Python](https://www.python.org/) com [FastAPI](https://fastapi.tiangolo.com/) — API REST
-- [Uvicorn](https://www.uvicorn.org/) — servidor ASGI
-- [SQLAlchemy](https://www.sqlalchemy.org/) — ORM (SQLite para desenvolvimento, MySQL para produção)
-- [Pydantic](https://docs.pydantic.dev/) — validação e formatos de entrada/saída da API
-- [python-jose](https://github.com/mpdavis/python-jose) + [bcrypt](https://pypi.org/project/bcrypt/) — autenticação (JWT) e hash de senhas
+### 🐍 Backend (API REST)
+- **Linguagem & Framework:** [Python 3.12](https://www.python.org/) com [FastAPI](https://fastapi.tiangolo.com/)
+- **Servidor ASGI:** [Uvicorn](https://www.uvicorn.org/)
+- **Banco de Dados & ORM:** [SQLAlchemy](https://www.sqlalchemy.org/) (SQLite para desenvolvimento / MySQL pronto para produção)
+- **Validação:** [Pydantic v2](https://docs.pydantic.dev/) + [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
+- **Autenticação:** [python-jose](https://github.com/mpdavis/python-jose) (JWT) e [bcrypt](https://pypi.org/project/bcrypt/)
+- **Cliente HTTP Assíncrono:** [httpx](https://www.python-httpx.org/) (comunicação de alta performance com a IA)
+
+### 🧠 Inteligência Artificial (Local & Privativa)
+- **Motor de Execução:** [Ollama](https://ollama.com/)
+- **Modelo:** `qwen2.5:14b` (Qwen 2.5 otimizado para raciocínio e linguagem natural em português)
+- **Conectividade Remota:** Suporte a rede mesh [Tailscale](https://tailscale.com/) para acesso remoto sem expor portas públicas.
 
 ---
 
-## 📁 Estrutura de Pastas
+## 📁 Estrutura do Repositório
 
 ```
 PDTCC-Imunizacao_Em_Seus_Dedos/
-├── README.md                    # Este arquivo
-├── GUIA-WINDOWS.md              # Guia detalhado de instalação no Windows
+├── README.md                          # Documentação completa do projeto
 │
-├── backend/                     # API REST (Python/FastAPI) + banco de dados
+├── backend/                           # API REST (FastAPI) + Banco de Dados
 │   ├── app/
-│   │   ├── main.py              # Ponto de entrada da API (monta rotas e CORS)
-│   │   ├── config.py            # Configurações via .env
-│   │   ├── database.py          # Conexão com o banco (SQLite/MySQL)
-│   │   ├── models.py            # Tabelas do banco (SQLAlchemy)
-│   │   ├── schemas.py           # Formatos de entrada/saída da API (Pydantic)
-│   │   ├── security.py          # Hash de senha (bcrypt) e tokens JWT
-│   │   ├── deps.py              # Dependências de autenticação por perfil
-│   │   ├── utils.py             # Funções auxiliares (datas, cálculos, etc.)
-│   │   └── routers/             # Uma rota por recurso da API
-│   │       ├── auth.py          # Login e cadastro (paciente, profissional, unidade)
-│   │       ├── patients.py      # Perfil, listagem e busca de pacientes
-│   │       ├── professionals.py # Perfil do profissional autenticado
-│   │       ├── vaccines.py      # Catálogo de vacinas
-│   │       ├── vaccinations.py  # Registro de vacinação aplicada
-│   │       ├── appointments.py  # Agenda (rede privada)
-│   │       ├── health_units.py  # Unidades de saúde (mapa)
-│   │       ├── queue.py         # Fila pública de vacinação (triagem)
-│   │       ├── campaigns.py     # Campanhas vacinais ativas
-│   │       └── stock.py         # Estoque de vacinas da unidade
+│   │   ├── main.py                    # Inicialização da API, CORS e montagem de rotas
+│   │   ├── config.py                  # Configurações centralizadas via .env
+│   │   ├── database.py                # Conexão e sessão do SQLAlchemy
+│   │   ├── models.py                  # Modelos relacionais (Usuários, Vacinas, Doses, etc.)
+│   │   ├── schemas.py                 # Schemas Pydantic (validação de entrada/saída)
+│   │   ├── security.py                # Hash de senhas (bcrypt) e geração de tokens JWT
+│   │   ├── deps.py                    # Dependências de injeção e controle de acesso
+│   │   └── routers/                   # Rotas organizadas por módulo
+│   │       ├── auth.py                # Login e cadastro (Paciente, Profissional, Unidade)
+│   │       ├── ai_assistant.py        # 🤖 Assistente Virtual com IA (Proxy Ollama + System Prompt)
+│   │       ├── patients.py            # Consulta e histórico de pacientes
+│   │       ├── professionals.py       # Perfil e ações do profissional
+│   │       ├── vaccines.py            # Catálogo oficial de vacinas do SUS/Privado
+│   │       ├── vaccinations.py        # Registro e validação de vacinas aplicadas
+│   │       ├── appointments.py        # Agendamento de doses
+│   │       ├── health_units.py        # Localização de UBSs e postos
+│   │       ├── campaigns.py           # Campanhas ativas de vacinação
+│   │       ├── queue.py               # Triagem e fila em tempo real
+│   │       └── stock.py               # Controle de lotes e estoque
 │   ├── database/
-│   │   └── schema.sql           # DDL de referência para MySQL
-│   ├── seed.py                  # Popula o banco com dados de demonstração
-│   ├── requirements.txt         # Dependências Python
-│   ├── .env.example             # Modelo de configuração do backend
-│   └── README.md                # Instruções completas de setup do backend
+│   │   └── schema.sql                 # DDL do banco para migração MySQL
+│   ├── seed.py                        # Script para popular dados de teste realistas
+│   ├── requirements.txt               # Dependências Python
+│   └── .env.example                   # Exemplo de variáveis de ambiente
 │
-└── VacinApp/                    # Aplicativo mobile (React Native/Expo)
-    ├── app/                     # Telas (Expo Router — cada arquivo é uma rota)
-    │   ├── (auth)/               # Autenticação
-    │   │   ├── login.tsx                  # Escolha do tipo de acesso
-    │   │   ├── login-user.tsx             # Login do paciente
-    │   │   ├── login-professional.tsx     # Login do profissional
-    │   │   ├── login-unit.tsx             # Login da unidade de saúde
-    │   │   ├── choose-registration.tsx    # Escolha do tipo de cadastro
-    │   │   ├── register-sus.tsx           # Cadastro de paciente (SUS)
-    │   │   └── register-private.tsx       # Cadastro de paciente (convênio)
-    │   ├── (patient)/            # Área do paciente
-    │   │   ├── home.tsx                   # Dashboard principal
-    │   │   ├── calendar.tsx               # Calendário vacinal
-    │   │   ├── map.tsx                    # Mapa de postos de vacinação
-    │   │   └── profile.tsx                # Perfil e dados pessoais
-    │   ├── (professional)/      # Área do profissional
-    │   │   ├── home.tsx                   # Dashboard do profissional
-    │   │   ├── patients.tsx               # Lista de pacientes
-    │   │   ├── search-patient.tsx         # Busca avançada de pacientes
-    │   │   ├── patient-profile.tsx        # Perfil completo do paciente
-    │   │   ├── register-vaccine.tsx       # Registrar nova vacinação
-    │   │   ├── agenda.tsx                 # Agenda (rede privada)
-    │   │   └── settings.tsx               # Configurações e logout
-    │   ├── (unit)/               # Área da unidade de saúde
-    │   │   └── triage.tsx                 # Triagem e fila de vacinação
-    │   ├── index.tsx             # Splash screen (com redirecionamento automático)
-    │   └── _layout.tsx           # Layout raiz (AuthProvider + navegação)
-    │
-    ├── components/               # Componentes reutilizáveis
-    │   ├── VaccineCard.tsx
-    │   ├── StatusBadge.tsx
-    │   ├── PrimaryButton.tsx
-    │   ├── InputField.tsx
-    │   ├── HealthUnitCard.tsx
-    │   ├── auth/                 # Componentes específicos das telas de autenticação
-    │   └── professional/         # Componentes específicos das telas do profissional
-    │
+└── VacinApp/                          # Frontend Mobile (React Native / Expo)
+    ├── app/                           # Telas e Roteamento (Expo Router)
+    │   ├── (auth)/                    # Fluxo de Autenticação
+    │   │   ├── login.tsx              # Seleção de tipo de perfil
+    │   │   ├── login-user.tsx         # Login do Paciente (CPF + Senha)
+    │   │   ├── login-professional.tsx # Login do Profissional (Email/Registro)
+    │   │   ├── login-unit.tsx         # Login da Unidade de Saúde (CNES)
+    │   │   ├── register-sus.tsx       # Cadastro Paciente SUS
+    │   │   └── register-private.tsx   # Cadastro Paciente Particular/Convênio
+    │   ├── (patient)/                 # Área do Paciente
+    │   │   ├── _layout.tsx            # Navegação por abas inferiores
+    │   │   ├── home.tsx               # Dashboard com status de imunização
+    │   │   ├── assistant.tsx          # 🤖 Chat do Assistente Virtual de Vacinação
+    │   │   ├── calendar.tsx           # Calendário vacinal por faixas etárias
+    │   │   ├── map.tsx                # Mapa interativo com postos próximos
+    │   │   └── profile.tsx            # Carteira digital e dados pessoais
+    │   ├── (professional)/            # Área do Profissional de Saúde
+    │   │   ├── home.tsx               # Painel de atendimento
+    │   │   ├── search-patient.tsx     # Busca de pacientes por CPF/CNS
+    │   │   ├── patient-profile.tsx    # Histórico e aplicação de vacinas
+    │   │   └── register-vaccine.tsx   # Formulário de aplicação com lote e validade
+    │   ├── (unit)/                    # Área da Unidade de Saúde
+    │   │   └── triage.tsx             # Fila de espera e triagem
+    │   ├── index.tsx                  # Splash / Redirecionamento de sessão
+    │   └── _layout.tsx                # Context Provider global
+    ├── components/                    # Componentes modulares reutilizáveis
     ├── contexts/
-    │   └── AuthContext.tsx       # Sessão do usuário (login, token, perfil, logout)
-    │
+    │   └── AuthContext.tsx            # Gerenciamento global de autenticação e sessão
     ├── services/
-    │   ├── PublicQueueStore.ts   # Fila pública de vacinação (via API)
-    │   └── api/                  # Cliente HTTP e funções por recurso da API
-    │       ├── client.ts         # Requisições HTTP + tratamento de erros
-    │       ├── config.ts         # Descoberta/configuração da URL da API
-    │       ├── token.ts          # Armazenamento do token (AsyncStorage)
-    │       ├── auth.ts           # Login e cadastro
-    │       ├── patients.ts       # Perfil, listagem e busca de pacientes
-    │       ├── professionals.ts  # Perfil do profissional
-    │       ├── vaccines.ts       # Catálogo de vacinas
-    │       ├── vaccinations.ts   # Registro de vacinação
-    │       ├── appointments.ts   # Agenda
-    │       ├── healthUnits.ts    # Unidades de saúde (mapa)
-    │       ├── campaigns.ts      # Campanhas vacinais
-    │       └── stock.ts          # Estoque de vacinas
-    │
-    ├── constants/
-    │   ├── Colors.ts              # Paleta de cores oficial
-    │   └── MockData.ts            # Tipos compartilhados com o backend
-    │
-    ├── assets/                    # Ícones e imagens do app
-    ├── app.json                   # Configuração do Expo
-    ├── package.json
-    └── README.md
+    │   └── api/                       # Camada de comunicação com a API REST
+    │       ├── client.ts              # Interceptor HTTP assíncrono
+    │       ├── config.ts              # Descoberta dinâmica de IP e URLs
+    │       ├── aiAssistant.ts         # 🤖 Serviço de integração com a IA
+    │       └── ...                    # Módulos por recurso (auth, vaccines, etc.)
+    └── constants/
+        └── Colors.ts                  # Design System e identidade de cores
 ```
 
 ---
 
-## 🚀 Como Iniciar o Projeto
+## 🤖 Módulo do Assistente Virtual (IA Local)
 
-O app precisa do **backend rodando** para funcionar de verdade (login, cadastro,
-histórico vacinal, etc. — nada mais é mockado). São dois passos: primeiro a
-API, depois o app mobile.
+O **VacinApp** conta com um assistente especializado em imunização humana no Brasil, projetado com privacidade e alto desempenho:
+
+### Como Funciona:
+1. **Frontend (`assistant.tsx`):** Fornece uma interface de chat interativa com balões de conversa, sugestões de perguntas frequentes (ex: *"Quais vacinas o bebê toma aos 2 meses?"*, *"Tomei a 1ª dose da Dengue, quando tomo a 2ª?"*) e animação de digitação/espera.
+2. **Backend Proxy (`ai_assistant.py`):** O backend recebe a pergunta autenticada via JWT, adiciona um **System Prompt especializado** baseado nas diretrizes do Ministério da Saúde / PNI (Programa Nacional de Imunizações) e encaminha para o Ollama de forma assíncrona.
+3. **Privacidade e Descentralização:** O processamento da IA é executado localmente na máquina, permitindo total sigilo de dados e funcionamento mesmo em redes locais fechadas.
+
+### Exemplo de Chamada da API:
+```http
+POST /ai/ask
+Content-Type: application/json
+Authorization: Bearer <SEU_TOKEN_JWT>
+
+{
+  "question": "Quais vacinas são recomendadas para gestantes?"
+}
+```
+
+**Resposta:**
+```json
+{
+  "question": "Quais vacinas são recomendadas para gestantes?",
+  "answer": "Para gestantes, o Calendário Nacional de Vacinação do SUS recomenda:\n\n1. **dTpa (Tríplice bacteriana acelular):** A partir da 20ª semana de gestação a cada gravidez.\n2. **Hepatite B:** 3 doses (caso não tenha sido vacinada anteriormente).\n3. **Influenza (Gripe):** Dose única em qualquer período gestacional durante a campanha.\n4. **Covid-19:** Conforme as orientações vigentes do Ministério da Saúde.\n\n*Lembre-se de sempre apresentar sua Caderneta da Gestante na UBS mais próxima.*",
+  "model": "qwen2.5:14b"
+}
+```
 
 ---
-# 🪟 Guia de Instalação — Windows
- 
-Guia detalhado para rodar o **VacinApp** (backend + app mobile) no Windows,
-com foco nos problemas mais comuns do PowerShell.
- 
----
- 
-## 📋 Pré-requisitos
- 
-| Programa | Versão recomendada | Link |
+
+## ⚙️ Pré-requisitos para Execução
+
+Antes de iniciar, garanta que seu computador possui os seguintes softwares instalados:
+
+| Software | Versão Recomendada | Finalidade |
 |---|---|---|
-| **Python** | 3.11 ou 3.12 (64 bits) | https://www.python.org/downloads/ |
-| **Node.js** | 18 LTS ou 20 LTS | https://nodejs.org/ |
-| **Git** *(opcional, só se for clonar via git)* | qualquer versão recente | https://git-scm.com/ |
-| **Expo Go** *(app no celular)* | mais recente | Play Store / App Store |
- 
-⚠️ No Windows, ao instalar o Python, marque a caixinha **"Add python.exe to
-PATH"** na primeira tela do instalador — isso evita muita dor de cabeça
-depois.
- 
-Para conferir se já está tudo certo, abra o PowerShell e rode:
- 
-```powershell
-python --version
-node --version
-npm --version
-```
- 
-Se algum desses der erro de "comando não reconhecido", o programa não está
-instalado ou não foi adicionado ao PATH.
- 
+| **Python** | `3.11` ou `3.12` (64-bit) | Executar o backend FastAPI e o banco de dados. *(Nota: Evite Python 3.14 devido à compatibilidade de wheels)* |
+| **Node.js** | `18 LTS` ou `20 LTS` | Gerenciador de pacotes e runtime do Expo |
+| **Ollama** | Versão mais recente | Executar o modelo de Inteligência Artificial local |
+| **Expo Go** | App no celular (Android / iOS) | Testar o app mobile em tempo real via QR Code |
+| **Tailscale** *(Opcional)* | Recente | Conectar dispositivos remotamente em rede mesh segura |
+
 ---
- 
-## 🚀 Passo a Passo
- 
-### Passo 1 — Backend (API + banco de dados)
- 
-Abra o PowerShell **na pasta do projeto** e siga um comando de cada vez:
- 
+
+## 🚀 Como Iniciar o Projeto Passo a Passo
+
+### 1️⃣ Inicializar o Motor de IA (Ollama)
+No seu computador, certifique-se de que o modelo `qwen2.5:14b` está baixado e ativo:
+
 ```powershell
-cd backend
-python -m venv venv
+# Baixar e testar o modelo
+ollama run qwen2.5:14b
 ```
- 
-**Ativar o ambiente virtual:**
-```powershell
-.\venv\Scripts\Activate.ps1
-```
-> Se aparecer erro de política de execução, rode antes:
-> `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
- 
-Depois de ativado, o terminal mostra `(venv)` no início da linha. **A partir
-daqui, todo comando abaixo é com o venv ativado**:
- 
-```powershell
-python -m pip install --upgrade pip setuptools wheel
-pip install -r requirements.txt
-```
- 
-**Configurar o ambiente** (copiar o arquivo de exemplo):
-```powershell
-copy .env.example .env
-```
-> Não precisa editar nada no `.env` — o padrão já usa SQLite (banco de
-> arquivo único, zero configuração).
- 
-**Criar o banco e popular com dados de teste:**
-```powershell
-python seed.py
-```
- 
-**Subir a API:**
-```powershell
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
- 
-✅ Se aparecer `Uvicorn running on http://0.0.0.0:8000`, o backend está no
-ar. Deixe esse terminal aberto e abra `http://localhost:8000/docs` no
-navegador — se a documentação da API carregar, está tudo certo.
- 
+> O Ollama ficará escutando por padrão em `http://localhost:11434`.
+
 ---
- 
-### Passo 2 — App mobile (frontend)
- 
-Abra **um novo terminal PowerShell** (não feche o do backend):
- 
+
+### 2️⃣ Configurar e Iniciar o Backend (FastAPI)
+
+1. Abra o terminal na pasta `backend`:
+   ```powershell
+   cd backend
+   ```
+
+2. Crie e ative o ambiente virtual:
+   ```powershell
+   # Criar o venv (usando Python 3.12)
+   py -3.12 -m venv venv
+
+   # Ativar no Windows (PowerShell)
+   .\venv\Scripts\Activate.ps1
+   ```
+   *(Caso ocorra erro de execução de scripts no PowerShell, execute: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`)*
+
+3. Instale as dependências:
+   ```powershell
+   python -m pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
+
+4. Configure o arquivo `.env`:
+   ```powershell
+   copy .env.example .env
+   ```
+   *As configurações padrão já estão prontas para desenvolvimento local (SQLite + Ollama localhost).*
+
+5. Popule o banco com dados de demonstração (pacientes, vacinas e profissionais):
+   ```powershell
+   python seed.py
+   ```
+
+6. Inicie o servidor FastAPI:
+   ```powershell
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   ```
+
+✅ **Backend ativo:** Acesse [http://localhost:8000/docs](http://localhost:8000/docs) para conferir a documentação interativa Swagger.
+
+---
+
+### 3️⃣ Iniciar o Frontend Mobile (Expo)
+
+1. Abra **um novo terminal** na pasta `VacinApp`:
+   ```powershell
+   cd VacinApp
+   ```
+
+2. Instale os pacotes npm:
+   ```powershell
+   npm install
+   ```
+
+3. Inicie o servidor Metro do Expo:
+   ```powershell
+   npx expo start
+   ```
+
+4. **Como abrir no celular:**
+   - Abra o app **Expo Go** no seu smartphone (conectado ao mesmo Wi-Fi do computador).
+   - Escaneie o QR Code que apareceu no terminal.
+   - *Dica:* Caso use Tailscale ou rede móvel, configure a variável `EXPO_PUBLIC_API_URL=http://<IP_DO_PC>:8000` em um arquivo `.env` dentro da pasta `VacinApp`.
+
+---
+
+## 🔑 Contas de Demonstração (Seed)
+
+O comando `python seed.py` cadastra contas prontas para teste da banca e desenvolvimento:
+
+> **Senha padrão para todos os perfis:** `senha1234`
+
+| Perfil | Identificador / Login | Detalhes |
+|---|---|---|
+| 🏥 **Paciente SUS** | CPF: `987.654.321-00` | Histórico com vacinas do SUS (COVID-19, Gripe, Febre Amarela). |
+| 🏥 **Paciente Convênio** | CPF: `123.456.789-00` | Histórico misto (rede pública e particular). |
+| 👩‍⚕️ **Profissional (SUS)** | E-mail: `fernanda.alves@saude.gov.br`<br>Registro: `COREN/SP-123456` | Enfermeira atuante em Unidade Básica de Saúde. |
+| 👨‍⚕️ **Profissional (Privado)** | E-mail: `ricardo.oliveira@vidasaude.com`<br>Registro: `CRM/SP-98765` | Médico em clínica de vacinação privada. |
+| 🏢 **Unidade de Saúde** | CNES: `1234567`<br>Usuário: `recepcao@ubscentral.gov.br` | Operador do painel de triagem e fila de atendimento. |
+
+---
+
+## 🌐 Principais Endpoints da API
+
+| Método | Endpoint | Descrição | Autenticação |
+|---|---|---|---|
+| `POST` | `/auth/login/patient` | Login do paciente por CPF | Não |
+| `POST` | `/auth/login/professional` | Login do profissional de saúde | Não |
+| `POST` | `/auth/login/unit` | Login da unidade de saúde | Não |
+| `POST` | `/ai/ask` | **Consulta ao Assistente Virtual de Imunização** | Sim (Bearer JWT) |
+| `GET` | `/patients/me` | Dados e carteira vacinal do paciente logado | Paciente |
+| `GET` | `/vaccines` | Catálogo de vacinas disponíveis | Sim |
+| `POST` | `/vaccinations` | Registro de aplicação de dose | Profissional |
+| `GET` | `/health-units` | Lista de postos e UBSs para o mapa | Sim |
+| `GET` | `/campaigns` | Campanhas de vacinação em andamento | Sim |
+| `GET` | `/queue` | Fila pública e status de triagem | Sim |
+
+---
+
+## 🛠️ Solução de Problemas Comuns
+
+### 1. "Failed wheel build for pydantic-core" no Python 3.14
+- **Causa:** O Python 3.14 ainda não possui binários pré-compilados no PyPI para bibliotecas em Rust/C++.
+- **Solução:** Use o **Python 3.12**. O projeto já está configurado para o ambiente Python 3.12.
+
+### 2. "Não foi possível conectar ao servidor" no aplicativo mobile
+- Verifique se o backend está rodando no terminal (`Uvicorn running on http://0.0.0.0:8000`).
+- Garanta que seu celular e computador estão na mesma rede Wi-Fi (ou conectados via Tailscale).
+- No Windows Defender Firewall, certifique-se de que a porta `8000` está liberada para a rede privada.
+
+### 3. "Assistente IA indisponível no momento"
+- Certifique-se de que o serviço do Ollama está aberto com o comando `ollama run qwen2.5:14b`.
+- Verifique se o endereço `OLLAMA_URL` no `.env` do backend aponta para `http://localhost:11434` (ou para o IP Tailscale configurado).
+
+### 4. Limpar cache do Expo
 ```powershell
 cd VacinApp
-npm install
-npx expo start
-```
- 
-Um QR Code vai aparecer no terminal. Abra o app **Expo Go** no celular (na
-mesma rede Wi-Fi do computador) e escaneie o QR Code.
- 
-> Se o app não conseguir "achar" o backend sozinho, crie um arquivo `.env`
-> dentro da pasta `VacinApp` com:
-> ```
-> EXPO_PUBLIC_API_URL=http://SEU_IP_LOCAL:8000
-> ```
-> (descubra seu IP local rodando `ipconfig` no PowerShell e procurando
-> "Endereço IPv4")
- 
----
- 
-## 🔑 Contas de demonstração
- 
-Criadas automaticamente pelo `python seed.py`. Senha de todas: **`senha1234`**
- 
-| Perfil | Login |
-|---|---|
-| Paciente SUS | CPF `987.654.321-00` |
-| Paciente Convênio | CPF `123.456.789-00` |
-| Profissional (rede pública) | `fernanda.alves@saude.gov.br` · registro `COREN/SP-123456` |
-| Profissional (rede privada) | `ricardo.oliveira@vidasaude.com` · registro `CRM/SP-98765` |
-| Unidade de Saúde (triagem) | CNES `1234567` · usuário `recepcao@ubscentral.gov.br` |
- 
----
- 
-## 🛠️ Solução de Problemas Comuns (Windows)
- 
-**`&&` não funciona no PowerShell**
-```
-O token '&&' não é um separador de instruções válido nesta versão.
-```
-→ Rode os comandos um por linha (como neste guia), ou use o `cmd.exe` no
-lugar do PowerShell.
- 
-**Erro compilando `pydantic-core`**
-```
-error: failed-wheel-build-for-install
-```
-→ Rode antes do `pip install -r requirements.txt`:
-```powershell
-python -m pip install --upgrade pip setuptools wheel
-```
- 
-**Tenho uma versão muito nova do Python (ex: 3.14) e os pacotes não instalam**
-→ Não precisa desinstalar. Instale o Python 3.12 ao lado e crie o `venv`
-apontando para ele:
-```powershell
-py -3.12 -m venv venv
-```
-(confira as versões instaladas com `py --list`)
- 
-**"Não foi possível conectar ao servidor" ao fazer login no app**
-- Confirme que o terminal do backend ainda está rodando e sem erros
-- No celular físico, backend e celular precisam estar na mesma rede Wi-Fi
-- Se a descoberta automática não funcionar, configure `EXPO_PUBLIC_API_URL`
-  manualmente (ver Passo 2)
-**Cache do Expo desatualizado**
-```powershell
-npx expo start --clear
-```
----
-
-### Solução de Problemas Comuns
-
-**Erro: "Unable to resolve module"**
-```bash
-npm install
-npx expo start --clear
-```
-
-**App não carrega no celular**
-- Certifique-se de que o celular e o computador estão na mesma rede Wi-Fi
-- Tente usar a opção "Tunnel" no menu do Expo (tecle `t` no terminal)
-
-**"Não foi possível conectar ao servidor" ao fazer login**
-- Confirme que o backend está rodando (`uvicorn app.main:app ...`) e acessível em `http://localhost:8000`
-- No celular físico, backend e celular precisam estar na mesma rede Wi-Fi
-- Se a descoberta automática não funcionar, configure `EXPO_PUBLIC_API_URL` manualmente (ver Passo 2)
-
-**Cache desatualizado**
-```bash
 npx expo start --clear
 ```
 
 ---
 
-## 🎨 Paleta de Cores
+## 🎨 Identidade Visual
 
-| Nome | Hex | Uso |
-|---|---|---|
-| Roxo Principal | `#685895` | Cor primária — botões e cabeçalhos do paciente |
-| Roxo Claro | `#988EC4` | Hover e destaques |
-| Lilás Suave | `#E8E8F7` | Fundos e áreas neutras |
-| Verde Profissional | `#588C5A` | Identidade visual do médico |
-| Verde Claro | `#A8D5A2` | Status e confirmações |
+- **Roxo Principal (`#685895`):** Acolhimento, tecnologia e cuidado — identidade do Paciente.
+- **Roxo Claro (`#988EC4`):** Destaques, seleções e botões secundários.
+- **Verde Profissional (`#588C5A`):** Saúde, segurança e rigor técnico — identidade do Profissional.
+- **Verde Suave (`#A8D5A2`):** Confirmações de doses aplicadas e validações.
+- **Fundo Neutro (`#F8F9FE`):** Leitura confortável e moderna.
 
 ---
 
 ## 📌 Status do Projeto
 
-🚧 Em desenvolvimento — TCC ETEC 2026
+✅ **Concluído e Funcional:**
+- Arquitetura completa Backend + Frontend integrada.
+- Sistema de autenticação JWT multicamadas.
+- Carteira vacinal digital e mapa de postos.
+- Assistente Virtual com IA Generativa local (Ollama/Qwen).
 
 ---
 
-## 👩‍💻 Autora
+## 👩‍💻 Autoria
 
-Desenvolvido por **Sophia Lorena** como TCC do curso técnico na ETEC.
+Desenvolvido por **Sophia Lorena**  
+*Trabalho de Conclusão de Curso (TCC) — ETEC — 2026*
