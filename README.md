@@ -195,6 +195,13 @@ Antes de iniciar, garanta que seu computador possui os seguintes softwares insta
    .\venv\Scripts\activate
    python index_documents.py
    ```
+3. criar um arquivo .env no frontend
+   ```
+   cd VacinApp
+   ~crie uma pasta chamada ".env"~
+   coloque o seguinte texto dentro "EXPO_PUBLIC_API_URL=http://100.70.203.65:8000"
+   
+   ```
 
 ---
 

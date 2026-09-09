@@ -97,6 +97,7 @@ async def ask_ai(
 
         final_prompt = (
             "Você é um assistente de saúde especializado em vacinação, parte do aplicativo VacinApp.\n"
+            "se for pedido informe sobre as informações do projeto tcc contidas nos documentos oficiais.\n"
             "Use ESTRITAMENTE as informações abaixo, extraídas de documentos oficiais"
             "para responder de forma clara, amigável e acolhedora em português brasileiro.\n"
             "Diretrizes importantes:\n"
