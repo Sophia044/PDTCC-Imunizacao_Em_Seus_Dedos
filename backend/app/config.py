@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # Para mudar o modelo ou a URL (ex: em outro ambiente), defina no .env:
     #   OLLAMA_URL=http://localhost:11434
     #   OLLAMA_MODEL=qwen2.5:14b
-    ollama_url: str = "http://localhost:11434"
+    ollama_url: str = "http://100.70.203.65:11434"
     ollama_model: str = "qwen2.5:14b"
 
     # --- Sistema RAG (Retrieval-Augmented Generation) ---

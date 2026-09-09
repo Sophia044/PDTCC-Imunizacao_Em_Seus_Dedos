@@ -97,11 +97,10 @@ async def ask_ai(
 
         final_prompt = (
             "Você é um assistente de saúde especializado em vacinação, parte do aplicativo VacinApp.\n"
-            "Use ESTRITAMENTE as informações abaixo, extraídas de documentos oficiais de vacinação "
-            "(Ministério da Saúde / SBIm), para responder de forma clara, amigável e acolhedora em português brasileiro.\n"
+            "Use ESTRITAMENTE as informações abaixo, extraídas de documentos oficiais"
+            "para responder de forma clara, amigável e acolhedora em português brasileiro.\n"
             "Diretrizes importantes:\n"
             "1. Não acrescente dados específicos (como datas ou dosagens) que não estejam presentes nos trechos abaixo.\n"
-            "2. Ao final da resposta, cite explicitamente que a informação foi obtida a partir dos documentos oficiais consultados (Ministério da Saúde / SBIm).\n\n"
             f"Informações dos documentos oficiais:\n{context_chunks_formatted}\n\n"
             f"Pergunta do usuário: {question_clean}"
         )
@@ -111,11 +110,13 @@ async def ask_ai(
         final_prompt = (
             "Você é um assistente de saúde especializado em vacinação, parte do aplicativo VacinApp.\n"
             "Não há informação sobre esta pergunta específica nos documentos oficiais disponíveis no sistema.\n"
-            "Responda com seu conhecimento geral sobre o assunto em português brasileiro, seguindo com rigor estas regras:\n"
+            "Responda com seu conhecimento geral sobre o assunto, seguindo com rigor estas regras:\n"
             "1. NUNCA invente dados específicos como datas precisas, números de doses ou nomes comerciais de produtos que você não tenha absoluta certeza.\n"
             "2. Dê apenas orientações gerais e educativas de saúde.\n"
             "3. Deixe claro ao usuário, de forma natural e empática, que esta resposta é baseada em conhecimento geral de saúde e não nos documentos oficiais atualizados da nossa base.\n"
-            "4. Sempre recomende ao paciente que confirme a informação em uma Unidade Básica de Saúde (UBS), posto de vacinação ou com um profissional de saúde habilitado.\n\n"
+            "4. quando convenient recomende ao paciente que confirme a informação em uma Unidade Básica de Saúde (UBS), posto de vacinação ou com um profissional de saúde habilitado.\n\n"
+            "5. Fale de forma simples e resumida para que seja entendido por todos.\n\n "
+            "6. Sempre responda em Portugues do Brasil"
             f"Pergunta do usuário: {question_clean}"
         )
 
