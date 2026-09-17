@@ -22,6 +22,7 @@ from app.routers import (
     appointments,
     auth,
     campaigns,
+    crm,             # Validação de CRM no portal do CFM
     health_units,
     patients,
     professionals,
@@ -61,6 +62,7 @@ app.include_router(health_units.router)
 app.include_router(queue.router)
 app.include_router(campaigns.router)
 app.include_router(stock.router)
+app.include_router(crm.router)      # GET /crm/validate?crm=...&uf=...
 
 
 @app.get("/", tags=["Status"])

@@ -66,6 +66,7 @@ O app funciona como **complemento** à carteira física — não como substituto
 | [bcrypt](https://pypi.org/project/bcrypt/) | 4.2.1 | Hash de senhas |
 | [PyMySQL](https://pypi.org/project/PyMySQL/) | 1.1.1 | Driver MySQL (produção) |
 | [email-validator](https://pypi.org/project/email-validator/) | 2.2.0 | Validação de e-mail |
+| [Playwright](https://playwright.dev/python/) | 1.45.0 | Browser headless para validação de CRM no portal do CFM |
 
 ---
 
@@ -85,8 +86,11 @@ PDTCC-Imunizacao_Em_Seus_Dedos/
 │   │   ├── security.py              # Hash de senha (bcrypt) e tokens JWT
 │   │   ├── deps.py                  # Dependências de autenticação por perfil
 │   │   ├── utils.py                 # Funções auxiliares (datas, cálculos)
+│   │   ├── utils/
+│   │   │   └── validar_crm.py       # Validação de CRM no portal do CFM (Playwright)
 │   │   └── routers/
 │   │       ├── auth.py              # Login e cadastro (paciente, profissional, unidade)
+│   │       ├── crm.py               # GET /crm/validate — valida CRM no portal do CFM
 │   │       ├── patients.py          # Perfil, listagem e busca de pacientes
 │   │       ├── professionals.py     # Perfil do profissional autenticado
 │   │       ├── vaccines.py          # Catálogo de vacinas disponíveis
@@ -243,6 +247,13 @@ copy .env.example .env
 ```powershell
 python seed.py
 ```
+
+**Instalar o browser headless (Playwright — necessário para validação de CRM):**
+```powershell
+python -m playwright install chromium
+```
+> ⚠️ Este passo é obrigatório na primeira vez. O Playwright baixa o Chromium
+> (~150 MB) para executar buscas no portal do CFM sem abrir janelas.
 
 **Subir a API:**
 ```powershell
