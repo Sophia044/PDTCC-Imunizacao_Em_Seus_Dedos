@@ -180,6 +180,8 @@ class RagService:
             # distância = 1 - similaridade
             similarity = max(0.0, min(1.0, 1.0 - float(distance)))
 
+            print(f"[RAG DEBUG] similaridade={similarity:.4f} | fonte={meta.get('source')} | preview={doc_text[:100]!r}")
+
             # DECISÃO CRÍTICA (TCC): Filtro de Relevância
             # Chunks com similaridade menor que o limiar são descartados para evitar alucinação
             if similarity >= settings.rag_similarity_threshold:

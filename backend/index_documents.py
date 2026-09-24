@@ -260,8 +260,16 @@ def main():
             batch_embeddings = []
 
             for chunk_item in batch:
-                emb = generate_embedding(chunk_item["text"], http_client)
-                batch_embeddings.append(emb)
+                try:
+                    print(f"    [DEBUG] chunk_id={chunk_item['id']} | tamanho={len(chunk_item['text'])} caracteres")
+                    print(f"    [DEBUG] preview: {repr(chunk_item['text'][:200])}")
+                    emb = generate_embedding(chunk_item["text"], http_client)
+                    batch_embeddings.append(emb)
+                except Exception as e:
+                    print(f"    [ERRO] Falhou no chunk_id={chunk_item['id']}")
+                    print(f"    [ERRO] Texto completo do chunk problemático:")
+                    print(repr(chunk_item["text"]))
+                    raise
 
             collection.add(
                 ids=batch_ids,
