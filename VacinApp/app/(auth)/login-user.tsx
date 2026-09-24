@@ -138,7 +138,7 @@ export default function LoginUserScreen() {
         {/* ---- LOGO ---- */}
         <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.logoRow}>
           <View style={styles.logoCircle}>
-          <Image source={require('../../assets/logo.png')} style={{ width: 38, height: 38 }} resizeMode="contain" />
+          <Image source={require('../../assets/logo.png')} style={{ width: 44, height: 44, borderRadius: 22 }} resizeMode="cover" />
           </View>
           <Text style={styles.logoText}>VacinApp</Text>
         </Animated.View>
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
 
   // Logo
   logoRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
-  logoCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.PRIMARY, alignItems: 'center', justifyContent: 'center' },
+  logoCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.PRIMARY, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 2, borderColor: Colors.PRIMARY },
   logoText:   { fontSize: 22, fontWeight: '800', color: Colors.PRIMARY },
 
   // Título

@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   // Seções
   section:       { marginBottom: 20 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  sectionTitle:  { fontSize: 17, fontWeight: '800', color: Colors.NEUTRAL.DARK_TEXT },
+  sectionTitle:  { fontSize: 17, fontWeight: '800', color: Colors.NEUTRAL.DARK_TEXT, marginBottom: 12 },
   sectionLink:   { fontSize: 13, fontWeight: '600', color: Colors.PROFESSIONAL },
 
   // Grid de ações (Rede Pública)

@@ -223,7 +223,7 @@ export default function LoginProfessionalScreen() {
         {/* ---- LOGO: ícone + nome do app ---- */}
         <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.logoRow}>
           <View style={styles.logoCircle}>
-          <Image source={require('../../assets/logo.png')} style={{ width: 38, height: 38 }} resizeMode="contain" />
+          <Image source={require('../../assets/logo.png')} style={{ width: 44, height: 44, borderRadius: 22 }} resizeMode="cover" />
           </View>
           <Text style={styles.logoText}>VacinApp</Text>
         </Animated.View>
@@ -407,6 +407,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.PROFESSIONAL,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: Colors.PROFESSIONAL,
   },
   logoText:   { fontSize: 22, fontWeight: '800', color: Colors.PROFESSIONAL },
 

@@ -152,7 +152,7 @@ export default function WelcomeScreen() {
           {/* Logo — ícone branco + nome do app */}
           <Animated.View entering={FadeInDown.delay(80).duration(500)} style={styles.logoRow}>
             <View style={styles.logoCircle}>
-            <Image source={require('../../assets/logo.png')} style={{ width: 34, height: 34 }} resizeMode="contain" />
+            <Image source={require('../../assets/logo.png')} style={{ width: 40, height: 40, borderRadius: 20 }} resizeMode="cover" />
             </View>
             <Text style={styles.logoName}>VacinApp</Text>
           </Animated.View>
@@ -347,6 +347,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.NEUTRAL.WHITE,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: Colors.PRIMARY,
     shadowColor: '#000',
     shadowOpacity: 0.15,
     shadowRadius: 6,

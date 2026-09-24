@@ -111,7 +111,7 @@ export default function SplashScreen() {
       <Animated.View style={[styles.logoWrap, logoStyle]}>
         {/* Círculo branco com ícone de cruz médica */}
         <View style={styles.iconCircle}>
-        <Image source={require('../assets/logo.png')} style={{ width: 84, height: 84 }} resizeMode="contain" />
+        <Image source={require('../assets/logo.png')} style={{ width: 100, height: 100, borderRadius: 50 }} resizeMode="cover" />
         </View>
         {/* Nome do aplicativo */}
         <Text style={styles.appName}>VacinApp</Text>
@@ -141,6 +141,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.NEUTRAL.WHITE,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 20,
+    overflow: 'hidden',
+    borderWidth: 2.5, borderColor: Colors.PRIMARY,
     // Sombra para profundidade
     shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 8,
   },
