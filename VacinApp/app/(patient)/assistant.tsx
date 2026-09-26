@@ -168,8 +168,8 @@ export default function AssistantScreen() {
         {/* ---- HEADER ROXO: Título da tela ---- */}
         <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Assistente Virtual 🤖</Text>
-            <Text style={styles.headerSubtitle}>Tire suas dúvidas sobre vacinação</Text>
+            <Text style={styles.headerTitle}>Picadinha 💉</Text>
+            <Text style={styles.headerSubtitle}>Inteligência Artificial · Tire suas dúvidas sobre vacinação</Text>
           </View>
           {/* Ícone decorativo do assistente */}
           <View style={styles.headerIcon}>
