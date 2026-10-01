@@ -85,6 +85,11 @@ export interface ProfessionalUser {
   networkType: ProfessionalNetworkType; // Rede de atuação
   unit: string;                   // Unidade de saúde (Rede Pública) ou vazio
   institution?: string;           // Instituição privada (Rede Privada) ou vazio
+  // ID da unidade de saúde vinculada (professional_health_units).
+  // Usado para pré-selecionar/travar o campo "Unidade de Saúde" na
+  // tela de Registrar Vacinação, garantindo que o valor exibido
+  // corresponda a um estabelecimento real cadastrado no backend.
+  healthUnitId?: string;
 }
 
 // -------------------------------------------------------
@@ -265,6 +270,7 @@ export const mockProfessionalPublic: ProfessionalUser = {
   registry: 'COREN/SP-123456',
   networkType: 'public',
   unit: 'UBS Jardim América',
+  healthUnitId: 'ubs-jardim-america',
 };
 
 export const mockProfessionalPrivate: ProfessionalUser = {
@@ -275,6 +281,7 @@ export const mockProfessionalPrivate: ProfessionalUser = {
   networkType: 'private',
   unit: '',
   institution: 'Clínica Vida Saúde',
+  healthUnitId: 'clinica-vida-saude',
 };
 
 // Helper para gerar datas ISO relativas (para testes de calendário)

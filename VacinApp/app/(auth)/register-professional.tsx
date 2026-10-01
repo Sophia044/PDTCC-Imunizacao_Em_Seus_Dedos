@@ -2,8 +2,16 @@
 // TELA: Cadastro de Profissional de Saúde
 // DESCRIÇÃO: Formulário de criação de conta para profissionais
 //            de saúde. Coleta dados profissionais (nome, CRM/COREN,
-//            especialidade, unidade) e credenciais de acesso.
-//            O cadastro requer verificação pela equipe VacinApp.
+//            especialidade, unidade, rede de atuação) e
+//            credenciais de acesso. O cadastro requer verificação
+//            pela equipe VacinApp (verification_status = pending).
+//
+// CORREÇÃO: o botão "Criar conta Profissional" navegava direto
+// para a home sem chamar a API — nenhuma conta era criada de
+// fato. Agora chama registerProfessional() (AuthContext), que já
+// existia e funcionava, só nunca tinha sido conectado aqui.
+// Também foi adicionado o seletor de rede (public/private),
+// exigido pelo endpoint POST /auth/professional/register.
 // ACESSO: Profissional (novo usuário)
 // ROTA: /app/(auth)/register-professional.tsx
 // ============================================================
@@ -13,12 +21,12 @@ import React, { useState } from 'react';
 
 // --- Componentes de layout e interação do React Native ---
 import {
-  KeyboardAvoidingView, Platform, ScrollView,
+  Alert, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 
 // --- Animações com Reanimated ---
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 // --- Navegação com Expo Router ---
 import { router } from 'expo-router';
@@ -36,6 +44,19 @@ import { Colors } from '../../constants/Colors';
 import { InputField } from '../../components/InputField';
 import { PrimaryButton } from '../../components/PrimaryButton';
 
+// --- Componentes reutilizáveis de autenticação (seletor de rede) ---
+import { AuthSegmentSelector, AuthContextMessage } from '../../components/auth';
+import type { SegmentOption } from '../../components/auth';
+
+// --- Sessão de autenticação e tratamento de erros da API ---
+import { useAuth } from '../../contexts/AuthContext';
+import { ApiError } from '../../services/api/client';
+
+// -------------------------------------------------------
+// Tipos
+// -------------------------------------------------------
+type NetworkType = 'public' | 'private';
+
 // -------------------------------------------------------
 // DADOS: Lista de especialidades médicas disponíveis para seleção
 // -------------------------------------------------------
@@ -44,17 +65,68 @@ const ESPECIALIDADES = [
   'Ginecologista/Obstetra', 'Geriatra', 'Médico/a de Família',
 ];
 
+const NETWORK_OPTIONS: SegmentOption[] = [
+  { value: 'public',  label: 'Rede Pública', icon: 'medkit' },
+  { value: 'private', label: 'Rede Privada', icon: 'shield-checkmark' },
+];
+
+const NETWORK_MESSAGES: Record<NetworkType, string> = {
+  public:  'Seu cadastro será vinculado a uma unidade da Rede Pública de Saúde.',
+  private: 'Seu cadastro será vinculado a uma instituição da Rede Privada.',
+};
+
 // -------------------------------------------------------
 // COMPONENTE PRINCIPAL: Tela de Cadastro do Profissional
 // -------------------------------------------------------
 export default function RegisterProfessionalScreen() {
-  const [name, setName]           = useState(''); // Nome completo do profissional
-  const [crm, setCrm]             = useState(''); // Número do registro (CRM/COREN)
-  const [spec, setSpec]           = useState(''); // Especialidade selecionada
-  const [unit, setUnit]           = useState(''); // Unidade de saúde vinculada
-  const [email, setEmail]         = useState(''); // E-mail institucional para login
-  const [password, setPassword]   = useState(''); // Senha de acesso
-  const [showSpecs, setShowSpecs] = useState(false); // Controla visibilidade do dropdown de especialidades
+  const [name, setName]                 = useState(''); // Nome completo do profissional
+  const [crm, setCrm]                   = useState(''); // Número do registro (CRM/COREN)
+  const [spec, setSpec]                 = useState(''); // Especialidade selecionada
+  const [unit, setUnit]                 = useState(''); // Unidade de saúde vinculada
+  const [networkType, setNetworkType]   = useState<NetworkType>('public'); // Rede de atuação
+  const [email, setEmail]               = useState(''); // E-mail institucional para login
+  const [password, setPassword]         = useState(''); // Senha de acesso
+  const [showSpecs, setShowSpecs]       = useState(false); // Controla visibilidade do dropdown
+  const [loading, setLoading]           = useState(false); // Estado de carregamento da API
+
+  const { registerProfessional } = useAuth();
+
+  // -------------------------------------------------------
+  // Validação e envio do cadastro à API
+  // -------------------------------------------------------
+  const handleSubmit = async () => {
+    if (!name.trim() || !crm.trim() || !unit.trim()) {
+      Alert.alert('Preencha os campos', 'Informe nome, registro profissional (CRM/COREN) e unidade de saúde.');
+      return;
+    }
+    if (!email.includes('@')) {
+      Alert.alert('E-mail inválido', 'Informe um e-mail válido.');
+      return;
+    }
+    if (password.length < 8) {
+      Alert.alert('Senha fraca', 'A senha deve ter no mínimo 8 caracteres.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await registerProfessional({
+        name,
+        professionalRegistry: crm,
+        specialty: spec || undefined,
+        unitName: unit,
+        networkType,
+        email,
+        password,
+      });
+      router.replace('/(professional)/home');
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Não foi possível criar sua conta. Tente novamente.';
+      Alert.alert('Erro ao cadastrar', message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     // KeyboardAvoidingView empurra o conteúdo para cima quando o teclado abre
@@ -77,6 +149,24 @@ export default function RegisterProfessionalScreen() {
         <Animated.View entering={FadeInDown.delay(200).duration(600)}>
           <Text style={styles.title}>Criar conta{'\n'}Profissional</Text>
           <Text style={styles.subtitle}>Para profissionais de saúde habilitados</Text>
+        </Animated.View>
+
+        {/* ---- SELETOR DE REDE (Pública / Privada) ---- */}
+        <Animated.View entering={FadeInDown.delay(260).duration(600)}>
+          <Text style={styles.segmentLabel}>Em qual rede você atua?</Text>
+          <AuthSegmentSelector
+            options={NETWORK_OPTIONS}
+            selected={networkType}
+            onChange={(value) => setNetworkType(value as NetworkType)}
+            variant="professional"
+          />
+          <Animated.View key={networkType} entering={FadeIn.duration(300)}>
+            <AuthContextMessage
+              message={NETWORK_MESSAGES[networkType]}
+              icon="business-outline"
+              variant="professional"
+            />
+          </Animated.View>
         </Animated.View>
 
         {/* ---- FORMULÁRIO: Dados Profissionais ---- */}
@@ -126,8 +216,12 @@ export default function RegisterProfessionalScreen() {
 
         {/* ---- BOTÃO: Criar conta Profissional ---- */}
         <Animated.View entering={FadeInDown.delay(600).duration(600)}>
-          {/* Usa a variante "professional" (verde) do PrimaryButton */}
-          <PrimaryButton label="Criar conta Profissional" onPress={() => router.replace('/(professional)/home')} variant="professional" />
+          <PrimaryButton
+            label={loading ? 'Criando conta...' : 'Criar conta Profissional'}
+            onPress={handleSubmit}
+            variant="professional"
+            disabled={loading}
+          />
         </Animated.View>
 
         {/* ---- LINK: Já tenho conta ---- */}
@@ -158,6 +252,9 @@ const styles = StyleSheet.create({
   // === TÍTULO E SUBTÍTULO ===
   title:         { fontSize: 28, fontWeight: '800', color: Colors.PROFESSIONAL, lineHeight: 34, marginBottom: 6 },
   subtitle:      { fontSize: 14, color: Colors.NEUTRAL.MUTED, marginBottom: 20 },
+
+  // === SELETOR DE REDE ===
+  segmentLabel:  { fontSize: 13, fontWeight: '700', color: Colors.NEUTRAL.DARK_TEXT, marginBottom: 10 },
 
   // === CARDS DE FORMULÁRIO ===
   card:          { backgroundColor: Colors.PROFESSIONAL_LIGHT, borderRadius: 16, padding: 16, marginBottom: 16 },

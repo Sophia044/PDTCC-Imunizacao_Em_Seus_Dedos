@@ -45,10 +45,14 @@ export default function ProfileScreen() {
   const pending  = vaccines.filter(v => v.status === 'pending').length;
   const overdue  = vaccines.filter(v => v.status === 'overdue').length;
 
+  // CORREÇÃO: adicionado o campo "Nº SUS" — o backend já retorna
+  // `patient.sus` (ver PatientProfileOut em backend/app/schemas.py),
+  // mas a tela nunca exibia esse dado ao paciente.
   const infoItems = [
     { icon: 'person-outline',   label: 'Nome',       value: patient?.name ?? '—' },
     { icon: 'calendar-outline', label: 'Nascimento', value: patient?.birthDate ?? '—' },
     { icon: 'card-outline',     label: 'CPF',        value: patient?.cpf ?? '—' },
+    { icon: 'id-card-outline',  label: 'Nº SUS',     value: patient?.sus ?? '—' },
     { icon: 'mail-outline',     label: 'E-mail',     value: patient?.email ?? '—' },
   ];
 

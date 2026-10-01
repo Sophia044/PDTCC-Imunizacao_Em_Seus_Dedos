@@ -145,6 +145,21 @@ class ProfessionalUserOut(CamelModel):
     network_type: str
     unit: str
     institution: Optional[str] = None
+    # ID da unidade de saúde vinculada (professional_health_units),
+    # usado pelo front-end para pré-selecionar/travar o campo
+    # "Unidade de Saúde" na tela de Registrar Vacinação.
+    health_unit_id: Optional[str] = None
+
+
+class ProfessionalVerifyRegistryRequest(CamelModel):
+    # Usado para "liberar" a troca de unidade de saúde na tela de
+    # registro de vacinação: o profissional confirma novamente o
+    # próprio CRM/COREN antes de poder escolher outra unidade.
+    professional_registry: str
+
+
+class ProfessionalVerifyResponse(CamelModel):
+    verified: bool
 
 
 # ------------------------------------------------------------
@@ -157,7 +172,10 @@ class VaccinationCreateRequest(CamelModel):
     manufacturer: Optional[str] = None
     lot: Optional[str] = None
     date: str  # DD/MM/YYYY
-    location: Optional[str] = None
+    # ID de uma unidade de saúde válida (tabela health_units).
+    # Se omitido, o backend usa a unidade vinculada ao profissional
+    # autenticado como padrão — nunca um texto livre digitado na tela.
+    health_unit_id: Optional[str] = None
     notes: Optional[str] = None
     network_type: str
 

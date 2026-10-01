@@ -7,6 +7,16 @@
 #
 # Como rodar:
 #   python seed.py
+#
+# CORREÇÃO (fila / agenda / campanhas / estoque não aparecem):
+# A profissional da rede pública (Fernanda) precisa estar
+# vinculada à MESMA unidade de saúde da recepção/triagem
+# (usuário institucional). Antes ela estava em "UBS Jardim
+# América" enquanto a triagem usava "UBS Central" — por isso
+# GET /queue (filtrado pela unidade ativa do profissional)
+# nunca via os pacientes que a recepção colocava na fila.
+# Campanhas e estoque foram movidos junto, para o dashboard da
+# profissional continuar mostrando esses dados corretamente.
 # ============================================================
 
 import datetime as dt
@@ -85,6 +95,11 @@ db.add(unit_user)
 # 4) Profissionais
 #    Pública:  fernanda.alves@saude.gov.br | COREN/SP-123456
 #    Privada:  ricardo.oliveira@vidasaude.com | CRM/SP-98765
+#
+#    CORREÇÃO: Fernanda agora está vinculada à UBS Central, a
+#    mesma unidade da recepção/triagem — a fila pública, as
+#    campanhas e o estoque precisam viver na mesma unidade dos
+#    dois lados (quem alimenta e quem consulta).
 # ------------------------------------------------------------
 user_fernanda = make_user("Fernanda Alves", "fernanda.alves@saude.gov.br", "professional")
 prof_fernanda = models.Professional(
@@ -93,7 +108,7 @@ prof_fernanda = models.Professional(
 )
 db.add(prof_fernanda)
 db.flush()
-db.add(models.ProfessionalHealthUnit(professional_id=prof_fernanda.id, health_unit_id=ubs_jardim.id))
+db.add(models.ProfessionalHealthUnit(professional_id=prof_fernanda.id, health_unit_id=ubs_central.id))
 
 user_ricardo = make_user("Ricardo Oliveira", "ricardo.oliveira@vidasaude.com", "professional")
 prof_ricardo = models.Professional(
@@ -201,14 +216,15 @@ add_appointment(fernanda_costa, "Dengue (Qdenga)", in_2_days, dt.time(14, 30), "
 add_appointment(mariana, "Tríplice Viral (SCR)", yesterday, dt.time(11, 0), "done")
 
 # ------------------------------------------------------------
-# 7) Campanhas e estoque (unidade pública de referência)
+# 7) Campanhas e estoque (agora na UBS Central, mesma unidade
+#    da profissional Fernanda e da recepção/triagem)
 # ------------------------------------------------------------
 db.add(models.Campaign(
-    health_unit_id=ubs_jardim.id, name="Campanha de Influenza 2026", target="Idosos acima de 60 anos",
+    health_unit_id=ubs_central.id, name="Campanha de Influenza 2026", target="Idosos acima de 60 anos",
     deadline=today + dt.timedelta(days=45), applied=312, goal=500,
 ))
 db.add(models.Campaign(
-    health_unit_id=ubs_jardim.id, name="Vacinação contra Dengue", target="População de 10 a 59 anos",
+    health_unit_id=ubs_central.id, name="Vacinação contra Dengue", target="População de 10 a 59 anos",
     deadline=today + dt.timedelta(days=75), applied=78, goal=300,
 ))
 
@@ -220,7 +236,7 @@ stock_data = [
 ]
 for vaccine_name, quantity, min_level in stock_data:
     db.add(models.StockItem(
-        health_unit_id=ubs_jardim.id, vaccine_id=vaccines[vaccine_name].id,
+        health_unit_id=ubs_central.id, vaccine_id=vaccines[vaccine_name].id,
         quantity=quantity, min_level=min_level,
     ))
 
@@ -232,6 +248,6 @@ print("Banco populado com sucesso!\n")
 print("Contas de demonstração (senha para todas: 'senha1234'):\n")
 print("  Paciente SUS ......... CPF 987.654.321-00  (Carlos Eduardo Lima)")
 print("  Paciente Convênio ..... CPF 123.456.789-00  (Ana Clara Souza)")
-print("  Profissional Pública .. fernanda.alves@saude.gov.br | COREN/SP-123456")
+print("  Profissional Pública .. fernanda.alves@saude.gov.br | COREN/SP-123456 (UBS Central)")
 print("  Profissional Privada .. ricardo.oliveira@vidasaude.com | CRM/SP-98765")
-print("  Unidade de Saúde ...... CNES 1234567 | recepcao@ubscentral.gov.br")
+print("  Unidade de Saúde ...... CNES 1234567 | recepcao@ubscentral.gov.br (UBS Central)")

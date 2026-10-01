@@ -13,7 +13,11 @@ export interface VaccinationPayload {
   manufacturer?: string;
   lot?: string;
   date: string; // DD/MM/YYYY
-  location?: string;
+  // ID de uma unidade de saúde válida (ver services/api/healthUnits.ts).
+  // Substitui o antigo campo de texto livre "location", que nunca era
+  // realmente usado pelo backend — o registro sempre foi gravado com a
+  // unidade vinculada ao profissional, independente do que era digitado.
+  healthUnitId: string;
   notes?: string;
   networkType: string;
 }

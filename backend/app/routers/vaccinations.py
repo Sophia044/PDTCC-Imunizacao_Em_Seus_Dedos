@@ -31,6 +31,37 @@ def _professional_active_unit(db: Session, professional: models.Professional) ->
     return link.health_unit
 
 
+def _resolve_health_unit(
+    db: Session, professional: models.Professional, health_unit_id: str | None
+) -> models.HealthUnit:
+    """
+    Determina a unidade de saúde do registro de vacinação.
+
+    - Se `health_unit_id` não for informado, usa a unidade vinculada
+      ao profissional autenticado (comportamento padrão/travado da
+      tela de registro).
+    - Se for informado, precisa ser o ID de uma unidade ativa
+      realmente cadastrada em `health_units` — nunca um texto livre.
+      O front-end só permite essa troca depois de o profissional
+      confirmar o próprio CRM/COREN em POST /professionals/me/verify-registry
+      e selecionar a unidade em uma lista (não digitar livremente),
+      mas o backend valida de qualquer forma, já que é a fonte da
+      verdade.
+    """
+    if not health_unit_id:
+        return _professional_active_unit(db, professional)
+
+    try:
+        unit_id = int(health_unit_id)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Unidade de saúde inválida.")
+
+    unit = db.get(models.HealthUnit, unit_id)
+    if unit is None or not unit.active:
+        raise HTTPException(400, "Unidade de saúde inválida.")
+    return unit
+
+
 @router.post("", response_model=schemas.VaccineOut, status_code=201)
 def register_vaccination(
     payload: schemas.VaccinationCreateRequest,
@@ -42,7 +73,7 @@ def register_vaccination(
         raise HTTPException(404, "Paciente não encontrado.")
 
     vaccine = _get_or_create_vaccine(db, payload.vaccine)
-    health_unit = _professional_active_unit(db, professional)
+    health_unit = _resolve_health_unit(db, professional, payload.health_unit_id)
 
     record = models.VaccinationRecord(
         patient_id=patient.id,
@@ -57,6 +88,25 @@ def register_vaccination(
         network_type=payload.network_type,
     )
     db.add(record)
+
+    # ----------------------------------------------------------------
+    # Ao registrar a vacina, marcar como "done" todos os agendamentos
+    # pendentes (scheduled) do mesmo paciente para essa mesma vacina.
+    # Isso garante que vacinas atrasadas (overdue) saiam do histórico
+    # assim que forem efetivamente aplicadas.
+    # ----------------------------------------------------------------
+    pending_appointments = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.patient_id == patient.id,
+            models.Appointment.vaccine_id == vaccine.id,
+            models.Appointment.status == "scheduled",
+        )
+        .all()
+    )
+    for appt in pending_appointments:
+        appt.status = "done"
+
     db.commit()
     db.refresh(record)
 
