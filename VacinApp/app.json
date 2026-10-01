@@ -11,7 +11,8 @@
     "plugins": [
       "expo-router",
       "expo-location",
-      "expo-font"
+      "expo-font",
+      "expo-status-bar"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",
