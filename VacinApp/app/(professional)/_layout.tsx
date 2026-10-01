@@ -18,7 +18,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View } from 'react-native';
+import { ColorValue, StyleSheet, View } from 'react-native';
 import { Colors } from '../../constants/Colors';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
@@ -26,7 +26,7 @@ type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 // -------------------------------------------------------
 // Componente interno: Ícone da tab bar
 // -------------------------------------------------------
-function TabIcon({ name, color, focused }: { name: IoniconsName; color: string; focused: boolean }) {
+function TabIcon({ name, color, focused }: { name: IoniconsName; color: ColorValue; focused: boolean }) {
   return (
     <View style={[tabStyles.iconWrap, focused && tabStyles.iconWrapActive]}>
       <Ionicons name={name} size={22} color={color} />
