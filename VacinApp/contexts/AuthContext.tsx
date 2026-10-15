@@ -11,6 +11,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 
 import type { PatientProfile, ProfessionalUser } from '@/constants/MockData';
 import * as authApi from '@/services/api/auth';
+import { runWithoutErrorPopups } from '@/services/api/client';
 import { getMyPatientProfile } from '@/services/api/patients';
 import { getMyProfessionalProfile } from '@/services/api/professionals';
 import { clearSession, loadStoredSession, type SessionType } from '@/services/api/token';
@@ -45,6 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [unit, setUnit] = useState<{ id: string; name: string; cnes: string } | null>(null);
 
   // Ao abrir o app, tenta restaurar a sessão salva no dispositivo.
+  // Falhas aqui (token expirado, backend desligado) NÃO abrem pop-up de
+  // erro: o usuário simplesmente cai na tela de login.
   useEffect(() => {
     (async () => {
       const { token, sessionType: storedType } = await loadStoredSession();
@@ -53,13 +56,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        if (storedType === 'patient') {
-          setPatient(await getMyPatientProfile());
-        } else if (storedType === 'professional') {
-          setProfessional(await getMyProfessionalProfile());
-        } else if (storedType === 'unit') {
-          setUnit(await authApi.getMyUnit());
-        }
+        await runWithoutErrorPopups(async () => {
+          if (storedType === 'patient') {
+            setPatient(await getMyPatientProfile());
+          } else if (storedType === 'professional') {
+            setProfessional(await getMyProfessionalProfile());
+          } else if (storedType === 'unit') {
+            setUnit(await authApi.getMyUnit());
+          }
+        });
         setSessionType(storedType);
       } catch {
         // Token expirado/inválido — volta para o login.

@@ -17,10 +17,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 // --- Sessão de autenticação (paciente/profissional/unidade) ---
 import { AuthProvider } from '../contexts/AuthContext';
 
+// --- Pop-up global de erros ---
+import { ErrorProvider } from '../contexts/ErrorContext';
+
 // -------------------------------------------------------
 // COMPONENTE PRINCIPAL: Layout Raiz
 // Envolve toda a aplicação no GestureHandlerRootView,
 // necessário para bibliotecas como Reanimated e gestos nativos,
+// no ErrorProvider, que exibe qualquer erro do app em um pop-up,
 // e no AuthProvider, que disponibiliza a sessão do usuário
 // (token, perfil) para qualquer tela do app.
 // -------------------------------------------------------
@@ -29,24 +33,26 @@ export default function RootLayout() {
     // GestureHandlerRootView deve envolver TODA a aplicação
     // para que os gestos (deslizar, arrastar) funcionem corretamente
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-      {/* Stack Navigator: gerencia a pilha de telas e navegação entre elas */}
-      <Stack screenOptions={{
-        headerShown: false, // Remove o cabeçalho padrão em todas as telas (cada tela tem o seu)
-        animation: 'fade',  // Transição suave com fade entre as telas
-      }}>
-        {/* Tela inicial (Splash Screen) */}
-        <Stack.Screen name="index" />
-        {/* Grupo de telas de autenticação: login e cadastros */}
-        <Stack.Screen name="(auth)" />
-        {/* Grupo de telas do paciente: home, calendário, mapa, perfil */}
-        <Stack.Screen name="(patient)" />
-        {/* Grupo de telas do profissional: home, pacientes, registrar, configurações */}
-        <Stack.Screen name="(professional)" />
-        {/* Grupo de telas institucionais: unidade de saúde e triagem pública */}
-        <Stack.Screen name="(unit)" />
-      </Stack>
-      </AuthProvider>
+      <ErrorProvider>
+        <AuthProvider>
+          {/* Stack Navigator: gerencia a pilha de telas e navegação entre elas */}
+          <Stack screenOptions={{
+            headerShown: false, // Remove o cabeçalho padrão em todas as telas (cada tela tem o seu)
+            animation: 'fade',  // Transição suave com fade entre as telas
+          }}>
+            {/* Tela inicial (Splash Screen) */}
+            <Stack.Screen name="index" />
+            {/* Grupo de telas de autenticação: login e cadastros */}
+            <Stack.Screen name="(auth)" />
+            {/* Grupo de telas do paciente: home, calendário, mapa, perfil */}
+            <Stack.Screen name="(patient)" />
+            {/* Grupo de telas do profissional: home, pacientes, registrar, configurações */}
+            <Stack.Screen name="(professional)" />
+            {/* Grupo de telas institucionais: unidade de saúde e triagem pública */}
+            <Stack.Screen name="(unit)" />
+          </Stack>
+        </AuthProvider>
+      </ErrorProvider>
     </GestureHandlerRootView>
   );
 }

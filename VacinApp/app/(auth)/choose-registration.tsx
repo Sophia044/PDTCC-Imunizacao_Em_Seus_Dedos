@@ -1,4 +1,4 @@
- expo// ============================================================
+// ============================================================
 // TELA: Escolha do Tipo de Cadastro
 // DESCRIÇÃO: Permite ao paciente escolher entre cadastro
 //            pela Rede Pública (SUS) ou Rede Privada (Convênio).
@@ -8,13 +8,15 @@
 // ele) — o cadastro de profissional era, na prática,
 // inalcançável. Foi adicionado o link "É profissional de
 // saúde? Cadastre-se aqui" abaixo do aviso informativo.
+// CORREÇÃO 2: removido um "expo" solto no início do arquivo,
+// que causava erro de sintaxe.
 // ACESSO: Paciente (novo usuário)
 // ROTA: /app/(auth)/choose-registration.tsx
 // ============================================================
 
 import React from 'react';
 import {
-  ScrollView, StyleSheet, Text, Image, TouchableOpacity, View,
+  ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { router } from 'expo-router';
@@ -85,7 +87,7 @@ export default function ChooseRegistrationScreen() {
         {/* ---- LOGO INLINE ---- */}
         <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.logoRow}>
           <View style={styles.logoCircle}>
-          <Image source={require('../../assets/logo.png')} style={{ width: 36, height: 36, borderRadius: 18 }} resizeMode="cover" />
+            <Ionicons name="medical" size={22} color={Colors.NEUTRAL.WHITE} />
           </View>
           <Text style={styles.logoText}>VacinApp</Text>
         </Animated.View>
@@ -130,7 +132,7 @@ export default function ChooseRegistrationScreen() {
           </Text>
         </Animated.View>
 
-        {/* ---- LINK: CADASTRO DE PROFISSIONAL (NOVO) ---- */}
+        {/* ---- LINK: CADASTRO DE PROFISSIONAL ---- */}
         <Animated.View entering={FadeInDown.delay(480).duration(600)} style={styles.loginRow}>
           <Text style={styles.loginText}>É profissional de saúde? </Text>
           <TouchableOpacity onPress={() => router.push('/(auth)/register-professional')}>
@@ -164,7 +166,7 @@ const styles = StyleSheet.create({
 
   // Logo
   logoRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 28 },
-  logoCircle:      { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.PRIMARY, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 2, borderColor: Colors.PRIMARY },
+  logoCircle:      { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.PRIMARY, alignItems: 'center', justifyContent: 'center' },
   logoText:        { fontSize: 18, fontWeight: '800', color: Colors.PRIMARY },
 
   // Título

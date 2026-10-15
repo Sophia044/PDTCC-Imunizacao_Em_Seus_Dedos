@@ -29,9 +29,11 @@ export interface PublicQueuePatient extends PublicQueueItem {
 
 export const getPublicVaccinationQueue = () => apiRequest<PublicQueuePatient[]>('/queue');
 
+// `silent: true` — "paciente não encontrado" (404) é um resultado esperado
+// da busca e a tela já mostra a mensagem própria; não deve abrir pop-up.
 export const findPatientBySus = async (sus: string): Promise<PatientProfile | undefined> => {
   try {
-    return await apiRequest<PatientProfile>(`/queue/find-patient?sus=${encodeURIComponent(sus)}`);
+    return await apiRequest<PatientProfile>(`/queue/find-patient?sus=${encodeURIComponent(sus)}`, { silent: true });
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return undefined;
     throw error;
