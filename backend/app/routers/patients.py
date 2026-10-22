@@ -4,10 +4,15 @@
 # /patients         -> profissional lista pacientes (resumo)
 # /patients/search  -> profissional busca por nome/cpf/sus/plano
 # /patients/{id}    -> profissional abre o perfil completo
+#
+# CRIPTOGRAFIA: CPF e CNS estão criptografados no banco, então não
+# dá para usar LIKE em SQL. A busca por nome/plano continua em SQL;
+# a busca por CPF/CNS (parcial) é feita em Python, depois que o
+# SQLAlchemy descriptografa os registros. Para o porte do projeto
+# (TCC) isso é perfeitamente adequado.
 # ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app import models, schemas, utils
@@ -15,6 +20,10 @@ from app.database import get_db
 from app.deps import current_patient, current_professional
 
 router = APIRouter(prefix="/patients", tags=["Pacientes"])
+
+
+def _base_query(db: Session):
+    return db.query(models.Patient).join(models.User)
 
 
 @router.get("/me", response_model=schemas.PatientProfileOut)
@@ -28,15 +37,14 @@ def list_patients(
     db: Session = Depends(get_db),
     _professional: models.Professional = Depends(current_professional),
 ):
-    patients_query = db.query(models.Patient).join(models.User)
+    patients = _base_query(db).order_by(models.User.name).all()
     if query:
-        like = f"%{query}%"
         digits = utils.only_digits(query)
-        conditions = [models.User.name.ilike(like)]
-        if digits:
-            conditions.append(models.Patient.cpf.like(f"%{digits}%"))
-        patients_query = patients_query.filter(or_(*conditions))
-    patients = patients_query.order_by(models.User.name).all()
+        needle = query.strip().lower()
+        patients = [
+            p for p in patients
+            if needle in p.user.name.lower() or (digits and digits in (p.cpf or ""))
+        ]
     return [utils.build_patient_summary(p) for p in patients]
 
 
@@ -47,19 +55,23 @@ def search_patients(
     db: Session = Depends(get_db),
     _professional: models.Professional = Depends(current_professional),
 ):
-    patients_query = db.query(models.Patient).join(models.User)
-    if query:
-        digits = utils.only_digits(query)
-        like = f"%{query}%"
-        if filter == "name":
-            patients_query = patients_query.filter(models.User.name.ilike(like))
-        elif filter == "cpf":
-            patients_query = patients_query.filter(models.Patient.cpf.like(f"%{digits}%")) if digits else patients_query.filter(False)
-        elif filter == "sus":
-            patients_query = patients_query.filter(models.Patient.sus_number.like(f"%{digits}%")) if digits else patients_query.filter(False)
-        elif filter == "plan":
-            patients_query = patients_query.filter(models.Patient.health_plan.ilike(like))
+    patients_query = _base_query(db)
+    digits = utils.only_digits(query)
+
+    # Filtros que ainda funcionam em SQL (campos não criptografados)
+    if query and filter == "name":
+        patients_query = patients_query.filter(models.User.name.ilike(f"%{query}%"))
+    elif query and filter == "plan":
+        patients_query = patients_query.filter(models.Patient.health_plan.ilike(f"%{query}%"))
+
     patients = patients_query.order_by(models.User.name).all()
+
+    # Filtros em campos criptografados: feitos em Python após descriptografar
+    if query and filter == "cpf":
+        patients = [p for p in patients if digits and digits in (p.cpf or "")]
+    elif query and filter == "sus":
+        patients = [p for p in patients if digits and digits in (p.sus_number or "")]
+
     return [utils.build_patient_profile(p) for p in patients]
 
 

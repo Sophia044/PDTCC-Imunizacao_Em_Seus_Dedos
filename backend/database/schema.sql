@@ -1,6 +1,11 @@
 -- ============================================================
 -- VacinApp - Esqueleto inicial do banco de dados MySQL
 -- Projeto: Imunizacao em Seus Dedos
+--
+-- CRIPTOGRAFIA: colunas marcadas com [CRIPTOGRAFADO] guardam o
+-- texto cifrado pelo backend (Fernet, ver app/crypto.py), por isso
+-- sao TEXT. Buscas exatas por CPF/CNS usam cpf_hash / sus_hash
+-- (HMAC-SHA256 em hexadecimal, 64 caracteres).
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS vacinapp
@@ -51,21 +56,23 @@ CREATE TABLE users (
 CREATE TABLE patients (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   user_id BIGINT UNSIGNED NOT NULL,
-  cpf CHAR(11) NOT NULL,
-  birth_date DATE NOT NULL,
-  phone VARCHAR(20) NULL,
+  cpf TEXT NOT NULL,                       -- [CRIPTOGRAFADO]
+  cpf_hash CHAR(64) NOT NULL,              -- HMAC-SHA256 do CPF (busca/unicidade)
+  birth_date TEXT NOT NULL,                -- [CRIPTOGRAFADO] (data ISO cifrada)
+  phone TEXT NULL,                         -- [CRIPTOGRAFADO]
   network_type ENUM('public', 'private') NOT NULL,
-  sus_number CHAR(15) NULL,
+  sus_number TEXT NULL,                    -- [CRIPTOGRAFADO]
+  sus_hash CHAR(64) NULL,                  -- HMAC-SHA256 do CNS (busca/unicidade)
   health_plan VARCHAR(120) NULL,
-  health_plan_card VARCHAR(80) NULL,
-  blood_type VARCHAR(3) NULL,
-  allergies TEXT NULL,
+  health_plan_card TEXT NULL,              -- [CRIPTOGRAFADO]
+  blood_type TEXT NULL,                    -- [CRIPTOGRAFADO]
+  allergies TEXT NULL,                     -- [CRIPTOGRAFADO]
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_patients_user_id (user_id),
-  UNIQUE KEY uq_patients_cpf_network (cpf, network_type),
-  UNIQUE KEY uq_patients_sus_number (sus_number),
+  UNIQUE KEY uq_patients_cpf_network (cpf_hash, network_type),
+  UNIQUE KEY uq_patients_sus_hash (sus_hash),
   KEY idx_patients_network_type (network_type),
   CONSTRAINT fk_patients_user
     FOREIGN KEY (user_id) REFERENCES users (id)
@@ -85,7 +92,7 @@ CREATE TABLE patients (
 CREATE TABLE professionals (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   user_id BIGINT UNSIGNED NOT NULL,
-  cpf CHAR(11) NULL,
+  cpf TEXT NULL,                           -- [CRIPTOGRAFADO]
   council_type ENUM('CRM', 'COREN', 'OTHER') NOT NULL,
   professional_registry VARCHAR(40) NOT NULL,
   specialty VARCHAR(120) NULL,
@@ -199,7 +206,8 @@ CREATE TABLE vaccination_records (
   manufacturer VARCHAR(120) NULL,
   lot VARCHAR(80) NULL,
   application_date DATE NOT NULL,
-  notes TEXT NULL,
+  next_dose_date DATE NULL,
+  notes TEXT NULL,                         -- [CRIPTOGRAFADO]
   network_type ENUM('public', 'private') NOT NULL,
   status ENUM('valid', 'cancelled', 'corrected') NOT NULL DEFAULT 'valid',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -235,7 +243,7 @@ CREATE TABLE appointments (
   appointment_date DATE NOT NULL,
   appointment_time TIME NOT NULL,
   status ENUM('scheduled', 'done', 'missed', 'cancelled') NOT NULL DEFAULT 'scheduled',
-  notes TEXT NULL,
+  notes TEXT NULL,                         -- [CRIPTOGRAFADO]
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -281,8 +289,6 @@ CREATE TABLE public_queue (
 
 -- ------------------------------------------------------------
 -- Campanhas vacinais ativas de uma unidade.
--- Acrescentada durante a integracao com o backend: a tela da
--- home do profissional ja previa este dado (card de campanha).
 -- ------------------------------------------------------------
 CREATE TABLE campaigns (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -303,8 +309,6 @@ CREATE TABLE campaigns (
 
 -- ------------------------------------------------------------
 -- Estoque de vacinas de uma unidade.
--- Acrescentada durante a integracao com o backend: usada no
--- alerta de estoque baixo na home do profissional.
 -- ------------------------------------------------------------
 CREATE TABLE stock_items (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

@@ -26,6 +26,17 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 24 * 7  # 7 dias
 
+    # --- Criptografia de dados sensíveis ---
+    # ENCRYPTION_KEYS: uma ou mais chaves Fernet separadas por vírgula.
+    #   A primeira é usada para criptografar; todas servem para
+    #   descriptografar (permite rotação de chaves).
+    # HASH_KEY: segredo do HMAC usado nos índices de busca (CPF / SUS).
+    # Gere ambos com: python generate_keys.py
+    # NUNCA versione o .env nem perca estas chaves: sem elas os dados
+    # criptografados ficam irrecuperáveis.
+    encryption_keys: str = ""
+    hash_key: str = ""
+
     # --- CORS ---
     # "*" libera qualquer origem — adequado para o Expo Go em
     # desenvolvimento. Restrinja em produção.

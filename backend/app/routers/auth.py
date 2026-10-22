@@ -6,12 +6,17 @@
 # Os formatos de entrada/saída seguem exatamente os payloads já
 # documentados nas telas do front-end (ver comentários
 # "PREPARADO PARA BACKEND" em VacinApp/app/(auth)/*.tsx).
+#
+# CRIPTOGRAFIA: CPF e CNS ficam criptografados no banco, então as
+# consultas usam os índices HMAC (cpf_hash / sus_hash) gerados por
+# blind_index() em vez de comparar o valor em texto puro.
 # ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app import models, schemas, utils
+from app.crypto import blind_index
 from app.database import get_db
 from app.deps import current_unit_user
 from app.security import create_access_token, hash_password, verify_password
@@ -29,8 +34,10 @@ def register_patient_sus(payload: schemas.PatientRegisterSusRequest, db: Session
 
     if db.query(models.User).filter_by(email=payload.email).first():
         raise HTTPException(400, "Este e-mail já está cadastrado.")
-    if db.query(models.Patient).filter_by(cpf=cpf, network_type="public").first():
+    if db.query(models.Patient).filter_by(cpf_hash=blind_index(cpf), network_type="public").first():
         raise HTTPException(400, "Este CPF já possui cadastro na rede pública.")
+    if db.query(models.Patient).filter_by(sus_hash=blind_index(cns)).first():
+        raise HTTPException(400, "Este CNS já possui cadastro.")
 
     user = models.User(name=payload.name, email=payload.email, password_hash=hash_password(payload.password), role="patient")
     db.add(user)
@@ -58,7 +65,7 @@ def register_patient_private(payload: schemas.PatientRegisterPrivateRequest, db:
 
     if db.query(models.User).filter_by(email=payload.email).first():
         raise HTTPException(400, "Este e-mail já está cadastrado.")
-    if db.query(models.Patient).filter_by(cpf=cpf, network_type="private").first():
+    if db.query(models.Patient).filter_by(cpf_hash=blind_index(cpf), network_type="private").first():
         raise HTTPException(400, "Este CPF já possui cadastro na rede privada.")
 
     user = models.User(name=payload.name, email=payload.email, password_hash=hash_password(payload.password), role="patient")
@@ -87,7 +94,7 @@ def login_patient(payload: schemas.PatientLoginRequest, db: Session = Depends(ge
     network_type = "public" if payload.network_type == "sus" else "private"
     cpf = utils.only_digits(payload.cpf)
 
-    patient = db.query(models.Patient).filter_by(cpf=cpf, network_type=network_type).first()
+    patient = db.query(models.Patient).filter_by(cpf_hash=blind_index(cpf), network_type=network_type).first()
     if patient is None or not verify_password(payload.password, patient.user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "CPF ou senha inválidos.")
     if not patient.user.active:
@@ -181,9 +188,7 @@ def login_professional(payload: schemas.ProfessionalLoginRequest, db: Session = 
     # Rede Privada: a instituição é obrigatória e precisa corresponder à
     # unidade de saúde vinculada a este profissional em
     # professional_health_units (ligação feita no cadastro, via
-    # _get_or_create_unit). Isso liga de fato o campo "Instituição" do
-    # login a um estabelecimento real do sistema, em vez de ser apenas
-    # texto decorativo.
+    # _get_or_create_unit).
     if payload.network_type == "private":
         institution = (payload.institution or "").strip()
         if not institution:

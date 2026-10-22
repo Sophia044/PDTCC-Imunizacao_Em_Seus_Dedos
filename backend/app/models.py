@@ -2,29 +2,34 @@
 # MODELOS DO BANCO DE DADOS (SQLAlchemy)
 #
 # Este arquivo é a fonte da verdade da estrutura do banco.
-# Ele espelha fielmente as tabelas descritas em
-# backend/database/schema.sql (o esqueleto original do projeto),
+# Ele espelha as tabelas descritas em backend/database/schema.sql
 # e acrescenta duas tabelas que as telas do profissional já
-# esperavam (campaigns e stock_items), que ainda não existiam
-# no schema original.
+# esperavam (campaigns e stock_items).
 #
-# Funciona tanto em SQLite (padrão, zero configuração) quanto em
-# MySQL (produção, ver README do backend) sem alterações.
+# CRIPTOGRAFIA: dados sensíveis (CPF, nascimento, telefone, CNS,
+# carteirinha, tipo sanguíneo, alergias, observações clínicas)
+# usam EncryptedString / EncryptedDate (ver app/crypto.py) e são
+# gravados cifrados. Para buscar por CPF / CNS usamos as colunas
+# cpf_hash / sus_hash (HMAC), preenchidas automaticamente por
+# eventos do SQLAlchemy — o restante do código não precisa se
+# preocupar com isso.
 # ============================================================
 
 import datetime as dt
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey,
-    Integer, Numeric, String, Text, UniqueConstraint, func,
+    Boolean, CheckConstraint, DateTime, Enum, ForeignKey,
+    Integer, Numeric, String, Text, UniqueConstraint, Date, event, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.crypto import EncryptedDate, EncryptedString, blind_index
 from app.database import Base
 
 
 # ------------------------------------------------------------
 # Usuários base do sistema: pacientes, profissionais e admins.
+# (senha = hash bcrypt; e-mail fica em texto para permitir login/unique)
 # ------------------------------------------------------------
 class User(Base):
     __tablename__ = "users"
@@ -48,7 +53,7 @@ class User(Base):
 class Patient(Base):
     __tablename__ = "patients"
     __table_args__ = (
-        UniqueConstraint("cpf", "network_type", name="uq_patients_cpf_network"),
+        UniqueConstraint("cpf_hash", "network_type", name="uq_patients_cpf_network"),
         CheckConstraint(
             "(network_type = 'public' AND sus_number IS NOT NULL) OR "
             "(network_type = 'private' AND health_plan IS NOT NULL AND health_plan_card IS NOT NULL)",
@@ -58,15 +63,22 @@ class Patient(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
-    cpf: Mapped[str] = mapped_column(String(11), nullable=False)
-    birth_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
-    phone: Mapped[str | None] = mapped_column(String(20))
+
+    # --- Campos criptografados ---
+    cpf: Mapped[str] = mapped_column(EncryptedString, nullable=False)
+    birth_date: Mapped[dt.date] = mapped_column(EncryptedDate, nullable=False)
+    phone: Mapped[str | None] = mapped_column(EncryptedString)
+    sus_number: Mapped[str | None] = mapped_column(EncryptedString)
+    health_plan_card: Mapped[str | None] = mapped_column(EncryptedString)
+    blood_type: Mapped[str | None] = mapped_column(EncryptedString)
+    allergies: Mapped[str | None] = mapped_column(EncryptedString)  # lista separada por vírgula
+
+    # --- Índices de busca (HMAC) — preenchidos automaticamente ---
+    cpf_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    sus_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
+
     network_type: Mapped[str] = mapped_column(Enum("public", "private", name="patient_network_type"), nullable=False)
-    sus_number: Mapped[str | None] = mapped_column(String(15), unique=True)
     health_plan: Mapped[str | None] = mapped_column(String(120))
-    health_plan_card: Mapped[str | None] = mapped_column(String(80))
-    blood_type: Mapped[str | None] = mapped_column(String(3))
-    allergies: Mapped[str | None] = mapped_column(Text)  # lista separada por vírgula
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -74,6 +86,16 @@ class Patient(Base):
     vaccination_records: Mapped[list["VaccinationRecord"]] = relationship(back_populates="patient")
     appointments: Mapped[list["Appointment"]] = relationship(back_populates="patient")
     queue_entries: Mapped[list["PublicQueueEntry"]] = relationship(back_populates="patient")
+
+
+def _fill_patient_hashes(mapper, connection, target: Patient) -> None:
+    """Recalcula os índices de busca sempre que o paciente é gravado."""
+    target.cpf_hash = blind_index(target.cpf)
+    target.sus_hash = blind_index(target.sus_number) if target.sus_number else None
+
+
+event.listen(Patient, "before_insert", _fill_patient_hashes)
+event.listen(Patient, "before_update", _fill_patient_hashes)
 
 
 # ------------------------------------------------------------
@@ -87,7 +109,7 @@ class Professional(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
-    cpf: Mapped[str | None] = mapped_column(String(11))
+    cpf: Mapped[str | None] = mapped_column(EncryptedString)
     council_type: Mapped[str] = mapped_column(Enum("CRM", "COREN", "OTHER", name="council_type"), nullable=False)
     professional_registry: Mapped[str] = mapped_column(String(40), nullable=False)
     specialty: Mapped[str | None] = mapped_column(String(120))
@@ -216,7 +238,7 @@ class VaccinationRecord(Base):
     lot: Mapped[str | None] = mapped_column(String(80))
     application_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     next_dose_date: Mapped[dt.date | None] = mapped_column(Date)
-    notes: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(EncryptedString)  # observações clínicas (reações etc.)
     network_type: Mapped[str] = mapped_column(Enum("public", "private", name="record_network_type"), nullable=False)
     status: Mapped[str] = mapped_column(
         Enum("valid", "cancelled", "corrected", name="record_status"), nullable=False, default="valid"
@@ -246,7 +268,7 @@ class Appointment(Base):
     status: Mapped[str] = mapped_column(
         Enum("scheduled", "done", "missed", "cancelled", name="appointment_status"), nullable=False, default="scheduled"
     )
-    notes: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(EncryptedString)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -279,8 +301,6 @@ class PublicQueueEntry(Base):
 
 # ------------------------------------------------------------
 # Campanhas vacinais ativas de uma unidade.
-# (Não existia no schema.sql original — a tela do profissional
-# já previa este dado, então a tabela foi acrescentada aqui.)
 # ------------------------------------------------------------
 class Campaign(Base):
     __tablename__ = "campaigns"
@@ -300,7 +320,6 @@ class Campaign(Base):
 
 # ------------------------------------------------------------
 # Estoque de vacinas de uma unidade.
-# (Idem acima: tabela nova para suportar a tela do profissional.)
 # ------------------------------------------------------------
 class StockItem(Base):
     __tablename__ = "stock_items"

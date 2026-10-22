@@ -3,6 +3,9 @@
 # Espelha o que services/PublicQueueStore.ts fazia em memória,
 # agora persistido no banco e vinculado à unidade do usuário
 # institucional autenticado.
+#
+# CRIPTOGRAFIA: o CNS (sus_number) é criptografado no banco; a
+# busca por CNS usa o índice HMAC (sus_hash) via blind_index().
 # ============================================================
 
 import datetime as dt
@@ -11,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app import models, schemas, utils
+from app.crypto import blind_index
 from app.database import get_db
 from app.deps import current_unit, current_unit_from_professional_or_unit
 
@@ -29,6 +33,13 @@ def _to_out(entry: models.PublicQueueEntry, position: int) -> schemas.PublicQueu
     )
 
 
+def _find_by_sus(db: Session, sus: str) -> models.Patient | None:
+    digits = utils.only_digits(sus)
+    if not digits:
+        return None
+    return db.query(models.Patient).filter_by(sus_hash=blind_index(digits)).first()
+
+
 @router.get("", response_model=list[schemas.PublicQueueItemOut])
 def get_queue(db: Session = Depends(get_db), unit: models.HealthUnit = Depends(current_unit_from_professional_or_unit)):
     entries = (
@@ -45,8 +56,7 @@ def get_queue(db: Session = Depends(get_db), unit: models.HealthUnit = Depends(c
 
 @router.get("/find-patient", response_model=schemas.PatientProfileOut)
 def find_patient_by_sus(sus: str, db: Session = Depends(get_db), _unit: models.HealthUnit = Depends(current_unit)):
-    digits = utils.only_digits(sus)
-    patient = db.query(models.Patient).filter_by(sus_number=digits).first()
+    patient = _find_by_sus(db, sus)
     if patient is None:
         raise HTTPException(404, "Nenhum paciente encontrado com esse número do SUS.")
     return utils.build_patient_profile(patient)
@@ -62,7 +72,7 @@ def add_to_queue(
     if payload.patient_id:
         patient = db.get(models.Patient, int(payload.patient_id))
     elif payload.sus:
-        patient = db.query(models.Patient).filter_by(sus_number=utils.only_digits(payload.sus)).first()
+        patient = _find_by_sus(db, payload.sus)
 
     if patient is None:
         raise HTTPException(404, "Paciente não encontrado.")
