@@ -64,6 +64,7 @@ O app funciona como **complemento** à carteira física — não como substituto
 | [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) | 2.7.1 | Configuração via `.env` |
 | [python-jose](https://github.com/mpdavis/python-jose) | 3.3.0 | Tokens JWT |
 | [bcrypt](https://pypi.org/project/bcrypt/) | 4.2.1 | Hash de senhas |
+| [cryptography](https://cryptography.io/) | 44.0.0 | Criptografia (Fernet/AES) dos dados sensíveis no banco |
 | [PyMySQL](https://pypi.org/project/PyMySQL/) | 1.1.1 | Driver MySQL (produção) |
 | [email-validator](https://pypi.org/project/email-validator/) | 2.2.0 | Validação de e-mail |
 | [Playwright](https://playwright.dev/python/) | 1.45.0 | Browser headless para validação de CRM no portal do CFM |
@@ -84,6 +85,7 @@ PDTCC-Imunizacao_Em_Seus_Dedos/
 │   │   ├── models.py                # Tabelas do banco (SQLAlchemy ORM)
 │   │   ├── schemas.py               # Formatos de entrada/saída (Pydantic)
 │   │   ├── security.py              # Hash de senha (bcrypt) e tokens JWT
+│   │   ├── crypto.py                # Criptografia de dados sensíveis (Fernet) + índices HMAC
 │   │   ├── deps.py                  # Dependências de autenticação por perfil
 │   │   ├── utils.py                 # Funções auxiliares (datas, cálculos)
 │   │   ├── utils/
@@ -103,6 +105,8 @@ PDTCC-Imunizacao_Em_Seus_Dedos/
 │   ├── database/
 │   │   └── schema.sql               # DDL de referência para MySQL
 │   ├── seed.py                      # Popula o banco com dados de demonstração
+│   ├── generate_keys.py             # Gera as chaves de criptografia (ENCRYPTION_KEYS / HASH_KEY)
+│   ├── test_encryption.py           # Teste automático da criptografia
 │   ├── requirements.txt             # Dependências Python
 │   └── .env.example                 # Modelo de configuração do backend
 │
@@ -241,12 +245,29 @@ pip install -r requirements.txt
 ```powershell
 copy .env.example .env
 ```
-> O padrão já usa SQLite — nenhuma edição necessária para rodar localmente.
+> O padrão já usa SQLite — nenhuma edição de banco é necessária para rodar localmente.
+
+**Gerar as chaves de criptografia** (obrigatório — a API não sobe sem elas):
+```powershell
+python generate_keys.py --write
+```
+> ⚠️ Isso grava `ENCRYPTION_KEYS` e `HASH_KEY` no `.env`. **Guarde uma cópia dessas chaves em
+> local seguro e nunca as envie ao Git.** Sem elas, os dados criptografados (CPF, CNS, telefone,
+> alergias etc.) não podem ser recuperados. Se o `.env` já tiver chaves preenchidas, o script
+> não as sobrescreve. Sem `--write`, o script apenas imprime as linhas para você colar manualmente.
 
 **Criar o banco e popular com dados de demonstração:**
 ```powershell
 python seed.py
 ```
+> ℹ️ O `seed.py` apaga e recria as tabelas. Rode-o sempre que atualizar o projeto para a versão
+> com criptografia, pois a estrutura das tabelas mudou.
+
+**(Opcional) Verificar se a criptografia está funcionando:**
+```powershell
+python test_encryption.py
+```
+> Deve terminar com "Tudo certo: a criptografia está funcionando.".
 
 **Instalar o browser headless (Playwright — necessário para validação de CRM):**
 ```powershell
@@ -328,6 +349,22 @@ py -3.12 -m venv venv
 ```
 (liste as versões instaladas com `py --list`)
 
+**`ENCRYPTION_KEYS não configurada` / `HASH_KEY não configurada` ao subir a API**
+→ Rode `python generate_keys.py --write` dentro da pasta `backend` (com o venv ativado) e
+suba a API novamente.
+
+**`Falha ao descriptografar: ENCRYPTION_KEYS diferente da usada para gravar os dados`**
+→ As chaves do `.env` não são as mesmas usadas quando os dados foram gravados. Restaure as
+chaves originais. Em desenvolvimento, se as perdeu, gere novas chaves (apague as linhas do
+`.env` e rode `python generate_keys.py --write`) e rode `python seed.py` para recriar o banco.
+
+**`no such column: patients.cpf_hash` (ou `Unknown column 'cpf_hash'`)**
+→ O banco foi criado antes da criptografia. No SQLite, rode `python seed.py`. No MySQL,
+execute novamente o `database/schema.sql` no Workbench.
+
+**`ModuleNotFoundError: No module named 'cryptography'`**
+→ Rode `pip install -r requirements.txt` com o venv ativado.
+
 ### App Mobile
 
 **"Não foi possível conectar ao servidor" ao fazer login**
@@ -371,6 +408,25 @@ presets: ['babel-preset-expo'],
 | Status Completo | `#588C5A` | Vacina tomada / em dia |
 | Status Pendente | `#E8A838` | Vacina agendada / pendente |
 | Status Atrasada | `#D9534F` | Vacina atrasada / vencida |
+
+---
+
+## 🔐 Segurança e Criptografia dos Dados
+
+- **Senhas:** armazenadas apenas como hash **bcrypt**.
+- **Dados sensíveis no banco:** cifrados com **Fernet (AES-128 + HMAC-SHA256)** antes de serem
+  gravados e descriptografados de forma transparente na leitura (`backend/app/crypto.py`).
+  Campos cifrados: CPF, data de nascimento, telefone, CNS, carteirinha do plano, tipo sanguíneo,
+  alergias (paciente), CPF (profissional) e observações clínicas (vacinações e agenda).
+- **Buscas por CPF e CNS:** como o texto cifrado muda a cada gravação, usa-se um índice de busca
+  (`cpf_hash` / `sus_hash`, **HMAC-SHA256** com chave separada) para login e consultas exatas.
+- **Chaves:** `ENCRYPTION_KEYS` e `HASH_KEY` ficam no `.env` (fora do Git). Para rotacionar,
+  coloque a chave nova na frente, separada por vírgula: `ENCRYPTION_KEYS=chave_nova,chave_antiga`.
+- **Como verificar:** rode `python test_encryption.py` ou consulte o banco diretamente — os campos
+  sensíveis aparecem como `enc:v1:gAAAA...`.
+- **Fora do escopo atual:** criptografia do arquivo do banco inteiro (SQLCipher / criptografia em
+  repouso do MySQL), HTTPS entre app e API e armazenamento seguro do token no dispositivo
+  (`expo-secure-store`) — melhorias recomendadas para produção.
 
 ---
 
