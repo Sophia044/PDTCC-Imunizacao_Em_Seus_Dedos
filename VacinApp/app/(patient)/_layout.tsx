@@ -36,10 +36,12 @@ export default function PatientLayout() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
-      <Tabs.Screen name="home"     options={{ title: 'Início',    tabBarIcon: ({ color, focused }) => <TabIcon name="home"          color={color} focused={focused} /> }} />
-      <Tabs.Screen name="calendar" options={{ title: 'Calendário', tabBarIcon: ({ color, focused }) => <TabIcon name="calendar"      color={color} focused={focused} /> }} />
-      <Tabs.Screen name="map"      options={{ title: 'Mapa',       tabBarIcon: ({ color, focused }) => <TabIcon name="map"           color={color} focused={focused} /> }} />
-      <Tabs.Screen name="profile"  options={{ title: 'Perfil',     tabBarIcon: ({ color, focused }) => <TabIcon name="person-circle" color={color} focused={focused} /> }} />
+      <Tabs.Screen name="home"      options={{ title: 'Início',      tabBarIcon: ({ color, focused }) => <TabIcon name="home"                   color={color} focused={focused} /> }} />
+      <Tabs.Screen name="calendar"  options={{ title: 'Calendário',  tabBarIcon: ({ color, focused }) => <TabIcon name="calendar"               color={color} focused={focused} /> }} />
+      <Tabs.Screen name="map"       options={{ title: 'Mapa',        tabBarIcon: ({ color, focused }) => <TabIcon name="map"                    color={color} focused={focused} /> }} />
+      {/* Tab do Assistente Virtual — integração com IA Local (Ollama / Qwen2.5:14b) */}
+      <Tabs.Screen name="assistant" options={{ title: 'Assistente',  tabBarIcon: ({ color, focused }) => <TabIcon name="chatbubble-ellipses"    color={color} focused={focused} /> }} />
+      <Tabs.Screen name="profile"   options={{ title: 'Perfil',      tabBarIcon: ({ color, focused }) => <TabIcon name="person-circle"          color={color} focused={focused} /> }} />
     </Tabs>
   );
 }
